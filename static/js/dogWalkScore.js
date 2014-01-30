@@ -16,6 +16,15 @@ var scoreMinutes2Distance = 20;
 var scorePower = 0.5;
 var scoreText;
 
+function DogShit() {
+    // ... reset map ...
+    ResetMap();
+    // ... and reset score ...
+    ResetScore()
+    // Enable text entry
+    FreezeFind(false);
+};
+
 function POISum(poiType, metrics) {
     // Sum POI's
     var total = 0;
@@ -67,8 +76,8 @@ function Score(go) {
         $('#slider').css('display', 'block');
         // Show score
         $('#score').css('display', 'block');
-        // Enable editing
-        FreezeText(false);
+        // Enable text entry
+        FreezeFind(false);
     };
 };
 
@@ -109,28 +118,44 @@ function FindAndRoute() {
                     Score(j == poiMetrics.length);
                 });
             };
+            // Score if no POI's are found
+            if (poiIds.length == 0) {
+                // Score
+                Score(true);
+            };
         } else {
             // FIXME Declare that it wasn't found
-            // Address wasn't found
-            Clear();
-            // Enable editing
-            FreezeText(false);
+            // Enable text entry
+            FreezeFind(false);
         };
     });
 };
 
-function FreezeText(isDisabled) {
+function SliderMove() {
+    // If a query exists ...
+    if (addressQuery) {
+        // ... update score
+        Score(true);
+    };
+};
+
+function FreezeFind(isDisabled) {
     // Disable or enable text box
-    console.log('Freezing', isDisabled);
     $('#address').prop('disabled', isDisabled);
 };
 
-function ResetZoom() {
-    // Reset pan and zoom
-    map.fitBounds(bounds);
+function ResetScore() {
+    // Reset score text
+    document.getElementById('score').innerText = scoreText;
+    // Reset score color
+    $('#score').css('background-color', scoreColor);
+    // Hide score
+    $('#score').css('display', 'none');
+    // Hide slider
+    $('#slider').css('display', 'none');
 };
 
-function Clear() {
+function ResetMap() {
     // Clear address query
     addressQuery = null;
     // Clear POI paths
@@ -142,22 +167,8 @@ function Clear() {
     // Clear address, tree, and POI markers
     geoJSON = [];
     map.markerLayer.setGeoJSON(geoJSON);
-    // Reset score text
-    document.getElementById('score').innerText = scoreText;
-    // Reset score color
-    $('#score').css('background-color', scoreColor);
-    // Hide score
-    $('#score').css('display', 'none');
-    // Hide slider
-    $('#slider').css('display', 'none');
-};
-
-function SliderMove() {
-    // If a query exists ...
-    if (addressQuery) {
-        // ... update score
-        Score(true);
-    };
+    // Reset pan and zoom
+    map.fitBounds(bounds);
 };
 
 function KeyPress(event) {
@@ -165,19 +176,21 @@ function KeyPress(event) {
     var box = $('#address').val();
     // If it is empty ...
     if (box == '' || box == null) {
-        // ... clear ...
-        Clear();
-        // ... and reset zoom ...
-        ResetZoom();
+        // ... reset map ...
+        ResetMap();
+        // ... and reset score ...
+        ResetScore()
     } else {
         // ... otherwise, if [enter] was pressed
         if (13 == event.keyCode) {
-            // ... clear ...
-            Clear();
+            // ... reset map ...
+            ResetMap();
+            // ... and reset score ...
+            ResetScore()
             // ... grab address ...
             addressQuery = box;
-            // ... disable editing ...
-            FreezeText(true);
+            // ... disable text entry ...
+            FreezeFind(true);
             // ... and find and route it
             FindAndRoute();
         };
