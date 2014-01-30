@@ -21,6 +21,18 @@ body {
     border : 1px solid gray;
     border-radius : 3px;
 }
+#menu #find img {
+    height : 23px;
+    margin : 0 0 0 10px;
+    opacity : 1.0;
+    vertical-align : top;
+}
+#menu #find img:hover {
+    opacity : 0.8;
+}
+#menu #find img:active {
+    -webkit-filter : invert(100%);
+}
 #menu div {
     background-color : #E8E8FF;
     padding : 15px;
@@ -53,7 +65,31 @@ body {
     top : 50px;
     width : 100%;
 }
+#loading {
+    background-color : gray;
+    display : block;
+    height : 100%;
+    left : 0;
+    opacity : 0.3;
+    position : fixed;
+    text-align : center;
+    top : 0;
+    visibility : hidden;
+    width : 100%;
+    z-index : 99;
+}
+#loading span {
+    display: inline-block;
+    height: 100%;
+    vertical-align: middle;
+}
+#loading img {
+    vertical-align : middle;
+    z-index : 100;
+}
 #dogshit {
+    background-color : gray;
+    border : 1px solid black;
     bottom : 0;
     display : block;
     height : 30px;
@@ -62,4 +98,7 @@ body {
     opacity : 0;
     position : absolute;
     width : 30px;
+}
+#dogshit:hover {
+    opacity : 0.4;
 }

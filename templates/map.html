@@ -5,24 +5,17 @@
 
     <div id='menu'>
       <div id='find'>
-        <input type='search' id='address' placeholder='Enter an address' onkeyup='KeyPress(event)' />
+        <input type='search' id='address' placeholder='Enter an address' onkeyup='KeyPress(event)' /><img id='paw' src='./static/img/dogWalkScore.png' onclick='PawClick()' />
       </div>
-<!--      <div>
-        How long are your walks?
-        <select id='duration'>
-          <option value='10'>10 minutes</option>
-          <option value='20'>20 minutes</option>
-          <option value='40'>40 minutes</option>
-        </select>
-      </div> -->
       <div id='slider'>
-        What is most important<br/>to you and your dog?<br /><br />
-<!--        <span title='Parks and dog-parks'>Play</span><input class='slider' type='range' onchange='SliderMove()' min='0' max='9' value='0' id='play' /><br /> -->
+        Where do you go with your dog?<br /><br />
         <span title='Dog-friendly restaurants'>Food</span><input class='slider' type='range' onchange='SliderMove()' min='0' max='9' value='9' id='food' /><br />
         <span title='Dog-friendly bars'>Drink</span><input class='slider' type='range' onchange='SliderMove()' min='0' max='9' value='5' id='drink' /><br />
       </div>
       <div id='score'>...</div>
     </div>
+
+    <div id='loading'><span></span><img src='./static/img/dogPaws.gif' alt='Paws for loading'></div>
 
     <div id='dogshit' onclick='DogShit()'></div>
 

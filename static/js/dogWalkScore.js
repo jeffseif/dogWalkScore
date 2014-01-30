@@ -11,8 +11,8 @@ var scoreColor;
 var scoreDistance;
 var scoreHi = 70.;
 var scoreLo = 30.;
-var scoreMax = 3;
-var scoreMinutes2Distance = 20;
+var scoreMax = 4;
+var scoreMinutes2Distance = 15;
 var scorePower = 0.5;
 var scoreText;
 
@@ -21,8 +21,8 @@ function DogShit() {
     ResetMap();
     // ... and reset score ...
     ResetScore()
-    // Enable text entry
-    FreezeFind(false);
+    // ... and hide loading
+    ShowLoading(false);
 };
 
 function POISum(poiType, metrics) {
@@ -37,52 +37,53 @@ function POISum(poiType, metrics) {
     return total;
 };
 
-function Score(go) {
-    // Force sequential execution
-    if (go) {
-        // Grab slider weights
-        weightPark = parseFloat($('#play').val());
-        weightPark = 0;
-        weightBar = parseFloat($('#drink').val());
-        weightRest = parseFloat($('#food').val());
-        // Normalize them
-        weightTotal = Math.max(1, weightPark + weightBar + weightRest);
-        weightPark /= weightTotal;
-        weightBar /= weightTotal;
-        weightRest /= weightTotal;
-        // Calculate score
-        var score = weightPark * POISum('park', poiMetrics)
-                  + weightBar * POISum('bar', poiMetrics)
-                  + weightRest * POISum('restaurant', poiMetrics);
-        // Normalize score
-        score = Math.floor(Math.min(1, score / scoreMax) * 100);
-        // Pick color
-        switch(true) {
-        case (score < scoreLo):
-            color = 'salmon';
-            break;
-        case (score > scoreHi):
-            color = 'limegreen';
-            break;
-        default:
-            color = 'khaki'
-            break;
-        };
-        // Set score text
-        document.getElementById('score').innerText = score + ' / 100';
-        // Set score color
-        $('#score').css('background-color', color);
-        // Show slider
-        $('#slider').css('display', 'block');
-        // Show score
-        $('#score').css('display', 'block');
-        // Enable text entry
-        FreezeFind(false);
+function Score() {
+    // Grab slider weights
+    weightPark = parseFloat($('#play').val());
+    weightPark = 0;
+    weightBar = parseFloat($('#drink').val());
+    weightRest = parseFloat($('#food').val());
+    // Normalize them
+    weightTotal = Math.max(1, weightPark + weightBar + weightRest);
+    weightPark /= weightTotal;
+    weightBar /= weightTotal;
+    weightRest /= weightTotal;
+    // Calculate score
+    var score = weightPark * POISum('park', poiMetrics)
+              + weightBar * POISum('bar', poiMetrics)
+              + weightRest * POISum('restaurant', poiMetrics);
+    // Normalize score
+    score = Math.floor(Math.min(1, score / scoreMax) * 100);
+    // Pick color
+    switch(true) {
+    case (score < scoreLo):
+        color = 'salmon';
+        break;
+    case (score > scoreHi):
+        color = 'limegreen';
+        break;
+    default:
+        color = 'khaki'
+        break;
     };
+    // Set score text
+    document.getElementById('score').innerText = score + ' / 100';
+    // Set score color
+    $('#score').css('background-color', color);
+    // Show slider
+    $('#slider').css('display', 'block');
+    // Show score
+    $('#score').css('display', 'block');
+    // Hide loading
+    ShowLoading(false);
 };
 
-function FindAndRoute() {
-    // Grab minutes
+function FindAndRoute(box) {
+    // Grab address ...
+    addressQuery = box;
+    // ... show loading ...
+    ShowLoading(true);
+    // ... and grab minutes
     minutes = 7; // FIXME
     // Scale score distance with duration
     scoreDistance = minutes * scoreMinutes2Distance / 2;
@@ -96,8 +97,6 @@ function FindAndRoute() {
             geoJSON.push(findJSON['address']);
             // Push POIs
             geoJSON = geoJSON.concat(findJSON['POIs']);
-            // Push trees
-            geoJSON = geoJSON.concat(findJSON['trees']);
             // Draw geoJSON markers
             map.markerLayer.setGeoJSON(geoJSON);
             // Grab nodeIds
@@ -114,19 +113,26 @@ function FindAndRoute() {
                     poiPaths.push(new L.polyline(latlngs, pathOptions).addTo(map));
                     // Populate score metrics
                     poiMetrics.push([routeJSON['poiType'], findJSON['offset'] + routeJSON['distance'] + routeJSON['offset']]);
-                    // Maybe score
-                    Score(j == poiMetrics.length);
+                    // If we are at the last POI ...
+                    if (j == poiMetrics.length) {
+                        // ... push trees ...
+                        geoJSON = geoJSON.concat(findJSON['trees']);
+                        // ... and redraw geoJSON markers
+                        map.markerLayer.setGeoJSON(geoJSON);
+                        // ... score ...
+                        Score();
+                    };
                 });
             };
             // Score if no POI's are found
             if (poiIds.length == 0) {
                 // Score
-                Score(true);
+                Score();
             };
         } else {
             // FIXME Declare that it wasn't found
-            // Enable text entry
-            FreezeFind(false);
+            // Hide loading
+            ShowLoading(false);
         };
     });
 };
@@ -135,13 +141,8 @@ function SliderMove() {
     // If a query exists ...
     if (addressQuery) {
         // ... update score
-        Score(true);
+        Score();
     };
-};
-
-function FreezeFind(isDisabled) {
-    // Disable or enable text box
-    $('#address').prop('disabled', isDisabled);
 };
 
 function ResetScore() {
@@ -171,6 +172,20 @@ function ResetMap() {
     map.fitBounds(bounds);
 };
 
+function PawClick() {
+    // Grab address box value
+    var box = $('#address').val();
+    // Reset map ...
+    ResetMap();
+    // ... and reset score ...
+    ResetScore()
+    // If it is not empty ...
+    if (box != '' && box != null) {
+        // ... and find and route
+        FindAndRoute(box);
+    };
+};
+
 function KeyPress(event) {
     // Grab address box value
     var box = $('#address').val();
@@ -187,13 +202,17 @@ function KeyPress(event) {
             ResetMap();
             // ... and reset score ...
             ResetScore()
-            // ... grab address ...
-            addressQuery = box;
-            // ... disable text entry ...
-            FreezeFind(true);
-            // ... and find and route it
-            FindAndRoute();
+            // ... and find and route
+            FindAndRoute(box);
         };
+    };
+};
+
+function ShowLoading(showLoading) {
+    if (showLoading) {
+        $('#loading').css('visibility', 'visible');
+    } else {
+        $('#loading').css('visibility', 'hidden');
     };
 };
 
@@ -210,7 +229,15 @@ function Load() {
     map.markerLayer.on('layeradd', function(e) {
         var marker = e.layer,
             feature = marker.feature;
+        //
         marker.setIcon(L.icon(feature.properties.icon));
+        //
+        if (feature.properties.yelpUrl != undefined) {
+            var popup = '<a href="' + feature.properties.yelpUrl + '">' + 
+                        feature.properties.title + '</a>';
+            //
+            marker.bindPopup(popup);
+        };
     });
     // Debug
     if (false) {
