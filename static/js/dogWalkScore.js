@@ -67,7 +67,7 @@ function Score() {
         break;
     };
     // Set score text
-    document.getElementById('score').innerText = score + ' / 100';
+    document.getElementById('score').innerText = 'Score: ' + score + ' / 100';
     // Set score color
     $('#score').css('background-color', color);
     // Show slider
