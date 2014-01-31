@@ -126,7 +126,11 @@ function FindAndRoute(box) {
             };
             // Score if no POI's are found
             if (poiIds.length == 0) {
-                // Score
+                // ... push trees ...
+                geoJSON = geoJSON.concat(findJSON['trees']);
+                // ... redraw geoJSON markers
+                map.markerLayer.setGeoJSON(geoJSON);
+                // ... and score
                 Score();
             };
         } else {
