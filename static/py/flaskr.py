@@ -14,7 +14,19 @@ from flask import Flask as Flask,\
 ### Initialize
 ###
 
+###
+# Flask
+###
 app = Flask(__name__);
+###
+# Build graph
+###
+id2Node, id2Edge, id2Poi, id2Tree, graphIds = dogWalkScore.MySql2Graph();
+###
+# Create global croppedIds
+###
+global croppedIds;
+croppedIds = [];
 
 ###
 ### Flask routing
@@ -84,15 +96,6 @@ def other():
 
 if __name__ == '__main__':
     ###
-    # Build graph
-    ###
-    id2Node, id2Edge, id2Poi, id2Tree, graphIds = dogWalkScore.MySql2Graph();
-    ###
-    # Create global croppedIds
-    ###
-    global croppedIds;
-    croppedIds = [];
-    ###
-    # Run Flask
+    # Run Flask in debug, port 8000
     ###
     app.run(debug = True, port = 5000, host = '0.0.0.0');

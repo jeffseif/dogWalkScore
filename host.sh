@@ -5,30 +5,35 @@
 ###
 APP='flaskr:app' ;
 DIR='../log/' ;
-GUNICORN="sudo gunicorn ${APP} -w 4 -b 0.0.0.0:80" ;
-SECONDS='5' ;
+IPADDRESS='0.0.0.0:80' ;
+RESTARTSECONDS='5' ;
+NUMWORKERS='1' ;
+PID="${DIR}pid" ;
+TIMEOUTSECONDS='300' ;
 
 ###
-# Declare PID
+# gunicorn command
 ###
-PID="${DIR}pid" ;
-\rm -f "${PID}" ;
-echo "$$" > "${PID}" ;
+GUNICORN="sudo gunicorn ${APP} -w ${NUMWORKERS} -b ${IPADDRESS} -p ${PID} --access-logfile - --error-logfile - --timeout ${TIMEOUTSECONDS}" ;
 
 ###
 # Host
 ###
 while [ 0 ] ; do
     ###
-    # Set log filename
+    # Set log/err filename
     ###
     LOG="${DIR}$(date "+%F-%T").log" ;
+    ERR="${DIR}$(date "+%F-%T").err" ;
     ###
     # Execute gunicorn
     ###
-    ${GUNICORN} >> "${LOG}" 2>&1 ;
+    echo "Starting gunicorn and dumping log to ${LOG}" ;
+    ${GUNICORN} >> "${LOG}" 2>> "${ERR}" ;
     ###
     # Upon fail wait before looping
     ###
-    sleep "${SECONDS}" ;
+    echo "gunicorn finished ... sleeping for ${RESTARTSECONDS}s ..." ;
+    sleep "${RESTARTSECONDS}" ;
+    echo "... restarting now" ;
 done ;
