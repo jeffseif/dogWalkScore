@@ -1301,7 +1301,7 @@ osmFileName = 'sf-city.osm' ;
 ###
 treeFileName = 'sfTrees';
 ###
-mySqlDataBase = 'dogWalkScore5';
+mySqlDataBase = 'dogWalkScore6';
 ###
 pickleFileName = '{}.pkl'.format(mySqlDataBase);
 
