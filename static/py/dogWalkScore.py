@@ -62,6 +62,7 @@ class Address:
         return;
 
 class Tree:
+    '''https://data.sfgov.org/Public-Works/Street-Tree-List/tkzw-k3nq''';
     def __init__(self, *args):
         if 4 == len(args):
             ###
@@ -81,6 +82,7 @@ class Tree:
         return;
 
 class POI:
+    '''http://www.yelp.com/developers/documentation/v2/search_api#rValue''';
     def __init__(self, *args):
         if 4 == len(args):
             json, poiType, nodeIds, offsets = args;
@@ -129,6 +131,7 @@ class POI:
         return self.id;
 
 class Node:
+    '''http://wiki.openstreetmap.org/wiki/Node''';
     def __init__(self, *args):
         if 1 == len(args):
             nodeXml, = args;
@@ -164,9 +167,6 @@ class Node:
         ###
         return;
     ###
-    def __len__(self):
-        return self.count;
-    ###
     def __sub__(self, other):
         return LatLngDistance(self.latitude, self.longitude, other.latitude, other.longitude);
     ###
@@ -175,6 +175,7 @@ class Node:
         return;
 
 class Edge:
+    '''http://wiki.openstreetmap.org/wiki/Way''';
     def __init__(self, *args):
         if 2 == len(args):
             xml, id2Node = args;
@@ -188,6 +189,9 @@ class Edge:
                     self.name = value;
             ###
             self.nodeIds = [int(nodeXml.attrib.get('ref')) for nodeXml in xml.iter('nd')];
+            ###
+            # Touch each sub-node
+            ###
             for nodeId in set(self.nodeIds):
                 ###
                 # Kick out unknown nodes
@@ -223,6 +227,7 @@ def PrintNow(*arguments, sep = '\n', end = '\n'):
     return;
 
 def GeoJSON(thing):
+    '''http://en.wikipedia.org/wiki/GeoJSON''';
     if isinstance(thing, list):
         return [GeoJSON(element) for element in thing];
     ###
@@ -286,6 +291,7 @@ def POIHash(json, poiType):
 ###
 
 def ReadOsmFile(osmFileName):
+    '''http://wiki.openstreetmap.org/wiki/OSM_XML''';
     import xml.etree.ElementTree as ET;
     ###
     PrintNow('Reading {:s} ... '.format(osmFileName), end = '');
@@ -354,24 +360,33 @@ def LinkNodes(nodeOne, nodeTwo, edge, id2Node):
 def BuildGraph(id2Node, id2Edge):
     PrintNow('Building graph ... ', end = '');
     intersectionIds = set();
+    ###
+    # Iterate over edges
+    ###
     for edge in id2Edge.values():
         intersections = [];
+        ###
+        # ... and their sub-nodes
+        ###
         for nodeId in edge.nodeIds:
             node = id2Node.get(nodeId);
             ###
-            if node is not None and len(node) > 1:
+            # Each node which is shared among multiple edges is an intersection
+            ###
+            if node is not None and node.count > 1:
                 intersections.append(node);
                 intersectionIds.update((nodeId, ));
+        ###
+        # Link intersection nodes
         ###
         prev = None;
         for curr in intersections:
             if prev is not None and prev.id != curr.id:
                 LinkNodes(prev, curr, edge, id2Node);
             prev = curr;
-    intersectionIds = list(intersectionIds);
     PrintNow('found {:d} intersections'.format(len(intersectionIds)));
     ###
-    return intersectionIds;
+    return;
 
 def FloodFill(startId, id2Node, label):
     '''http://en.wikipedia.org/wiki/Flood_fill''';
@@ -390,41 +405,62 @@ def FloodFill(startId, id2Node, label):
         node.label = label;
         count += 1;
         ###
+        # ... and recurse to its neighbors
+        ###
         for nodeId in node.nodeIds:
             ###
-            # ... and recurse
+            # The count is passed up the tree to the initiating node
             ###
             count += FloodFill(nodeId, id2Node, label);
     ###
     return count;
 
-def TrimGraph(id2Node):
+def TrimGraph(id2Node, id2Edge):
     PrintNow('Finding largest subgraph ... ', end = '');
+    ###
+    # Label every node according to the subgraph to which it belongs
     ###
     label2Count = {};
     label = 0;
     for nodeId in id2Node:
         count = FloodFill(nodeId, id2Node, label);
-        if count:
+        if count > 2:
             label2Count[label] = count;
-            ###
-            count = 0;
-            label += 1;
+        ###
+        label += 1;
+    ###
+    # Find the largest subgraph
     ###
     graphLabel = maxCount = 0;
     for label, count in label2Count.items():
         if count >= maxCount:
             graphLabel, maxCount = label, count;
     ###
-    graphIds = {nodeId : node for nodeId, node in id2Node.items() if node.label == graphLabel};
+    # Gather IDs from the largest subgraph
+    ###
+    graphIds = [nodeId for nodeId, node in id2Node.items() if node.label == graphLabel];
     PrintNow('contains {:d} nodes'.format(len(graphIds)));
+    ###
+    # Gather the IDs from other subgraphs and trim them
+    ###
+    trimNodeIds = [nodeId for nodeId, node in id2Node.items() if node.label in label2Count and node.label!= graphLabel];
+    ###
+    for nodeId in trimNodeIds:
+        id2Node.pop(nodeId);
+    ###
+    # Trim edges
+    ###
+    trimEdgeIds = [edge.id for edge in id2Edge.values() if not any(nodeId in id2Node for nodeId in edge.nodeIds)];
+    for edgeId in trimEdgeIds:
+        id2Edge.pop(edgeId);
+    PrintNow('Graph trimmed to {:d} nodes and {:d} edges'.format(len(id2Node), len(id2Edge)));
     ###
     return graphIds;
 
 def SimpleDistance(latitude1, longitude1, latitude2, longitude2):
     return ((meterPerLat * (latitude1 - latitude2)) ** 2 + (meterPerLng * (longitude1 - longitude2)) ** 2);
 
-def FakeLink(nodeIds, id2Node, id2Edge):
+def ZeroLink(nodeIds, id2Node, id2Edge):
     ###
     # Find unique edgeId
     ###
@@ -489,7 +525,7 @@ def CloseGraph(id2Node, id2Edge, graphIds):
     for latlng, nodeIds in latlng2NodeIds.items():
         if len(nodeIds) > 1:
             count += 1;
-            FakeLink(nodeIds, id2Node, id2Edge);
+            ZeroLink(nodeIds, id2Node, id2Edge);
     ###
     PrintNow('closed {:d} disconnections.'.format(count));
     ###
@@ -757,8 +793,7 @@ def Mashup(osmFileName, datDirectory, pickleFileName = None):
         ###
         id2Node = pickle.get('id2Node');
         id2Edge = pickle.get('id2Edge');
-        intersectionIds = pickle.get('intersectionIds');
-        graphIds = pickle.get('intersectionIds');
+        graphIds = pickle.get('graphIds');
         id2Poi = pickle.get('id2Poi');
         id2Tree = pickle.get('id2Tree');
         ###
@@ -781,11 +816,11 @@ def Mashup(osmFileName, datDirectory, pickleFileName = None):
         ###
         # Build graph
         ###
-        intersectionIds = BuildGraph(id2Node, id2Edge);
+        BuildGraph(id2Node, id2Edge);
         ###
         # Trim disconnected graphs
         ###
-        graphIds = TrimGraph(id2Node);
+        graphIds = TrimGraph(id2Node, id2Edge);
         ###
         # Link identical nodes with 0-length edges
         ###
@@ -804,7 +839,6 @@ def Mashup(osmFileName, datDirectory, pickleFileName = None):
         dat = {
             'id2Node' : id2Node,
             'id2Edge' : id2Edge,
-            'intersectionIds' : intersectionIds,
             'graphIds' : graphIds,
             'id2Poi' : id2Poi,
             'id2Tree' : id2Tree,
@@ -980,7 +1014,7 @@ def FindAddress(query, minutes, id2Node, id2Poi, graphIds, id2Tree):
     ###
     # Crop graph
     ###
-    bufferIds = CropGraph(center, radius * 2.5, id2Node, graphIds, 'nodes');
+    bufferIds = CropGraph(center, radius * 1.5, id2Node, graphIds, 'nodes');
     croppedIds = CropGraph(center, radius, id2Node, bufferIds, 'nodes');
     ###
     # Snap to nearest node
