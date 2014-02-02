@@ -11,7 +11,7 @@ var scoreColor;
 var scoreDistance;
 var scoreHi = 70.;
 var scoreLo = 30.;
-var scoreMax = 4;
+var scoreMax = 3;
 var scoreMinutes2Distance = 15;
 var scorePower = 0.5;
 var scoreText;
