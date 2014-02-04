@@ -87,8 +87,8 @@ def contact():
     return FlaskRender('contact.html');
 
 @app.route('/<other>')
-def other():
-    return index();
+def other(other):
+    return about();
 
 ###
 ### Script
