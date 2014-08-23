@@ -1,101 +1,87 @@
 #! /usr/bin/env python3
 
-###
-### Import
-###
+# Import
 
-import dogWalkScore;
+import dogWalkScore
 from flask import Flask as Flask,\
                   jsonify as FlaskJSONify,\
                   render_template as FlaskRender,\
-                  request as FlaskRequest;
+                  request as FlaskRequest
 
-###
-### Initialize
-###
+# Initialize
 
-###
 # Flask
-###
-app = Flask(__name__);
-###
+app = Flask(__name__)
 # Build graph
-###
-id2Node, id2Edge, id2Poi, id2Tree, graphIds = dogWalkScore.MySql2Graph();
-###
+id2Node, id2Edge, id2Poi, id2Tree, graphIds = dogWalkScore.MySql2Graph()
 # Create global croppedIds
-###
-global croppedIds;
-croppedIds = [];
+global croppedIds
+croppedIds = []
 
-###
-### Flask routing
-###
+# Flask routing
 
 @app.route('/')
 def index():
-    return FlaskRender('map.html');
+    return FlaskRender('map.html')
 
 @app.route('/findAddress')
 def findAddress():
-    ###
+
     # Grab address from url
-    ###
-    address = FlaskRequest.args.get('q', '');
-    minutes = float(FlaskRequest.args.get('m', ''));
-    ###
+
+    address = FlaskRequest.args.get('q', '')
+    minutes = float(FlaskRequest.args.get('m', ''))
+
     # Process the address
-    ###
-    json = dogWalkScore.FindAddress(address, minutes, id2Node, id2Poi, graphIds, id2Tree);
-    ###
+
+    json = dogWalkScore.FindAddress(address, minutes, id2Node, id2Poi, graphIds, id2Tree)
+
     # Check for bad address
-    ###
+
     if json is None:
-        return FlaskJSONify({});
-    ###
+        return FlaskJSONify({})
+
     # Update croppedIds
-    ###
-    croppedIds.clear();
-    croppedIds.extend(json.get('croppedIds'));
-    ###
+
+    croppedIds.clear()
+    croppedIds.extend(json.get('croppedIds'))
+
     # JSONify it
-    ###
-    return FlaskJSONify(json);
+
+    return FlaskJSONify(json)
 
 @app.route('/routePOI')
 def routePOI():
-    ###
+
     # Grab startId/poiId from url
-    ###
-    startId = int(FlaskRequest.args.get('s', ''));
-    poiId = int(FlaskRequest.args.get('p', ''));
-    ###
+
+    startId = int(FlaskRequest.args.get('s', ''))
+    poiId = int(FlaskRequest.args.get('p', ''))
+
     # Route to the POI
-    ###
-    json = dogWalkScore.RoutePOI(startId, poiId, croppedIds, id2Node, id2Edge, id2Poi);
-    ###
+
+    json = dogWalkScore.RoutePOI(startId, poiId, croppedIds, id2Node, id2Edge, id2Poi)
+
     # JSONify it
-    ###
-    return FlaskJSONify(json);
+
+    return FlaskJSONify(json)
 
 @app.route('/about')
 def about():
-    return FlaskRender('about.html');
+    return FlaskRender('about.html')
 
 @app.route('/contact')
 def contact():
-    return FlaskRender('contact.html');
+    return FlaskRender('contact.html')
 
 @app.route('/<other>')
 def other(other):
-    return about();
+    return about()
 
-###
-### Script
-###
+# Script
 
 if __name__ == '__main__':
-    ###
+
     # Run Flask in debug, port 8000
-    ###
-    app.run(debug = True, port = 5000, host = '0.0.0.0');
+
+    app.run(debug = True, port = 5000, host = '0.0.0.0')

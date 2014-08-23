@@ -1,243 +1,228 @@
 #! /usr/bin/env python3
 
-###
-### Import
-###
+# Import
 
-from json import loads as JSONLoad;
+from json import loads as JSONLoad
 from math import pi as pi,\
                  sin as Sine,\
                  cos as Cosine,\
-                 acos as ArcCosine;
-from os.path import exists as Exists;
+                 acos as ArcCosine
+from os.path import exists as Exists
 from pickle import dump as Pickle,\
-                   load as UnPickle;
-import sys;
-###
+                   load as UnPickle
+import sys
 # Maybe import MySql
-###
 try:
-    from pymysql import connect as MySqlConnect;
+    from pymysql import connect as MySqlConnect
 except ImportError:
-    pass;
+    pass
 
-###
-### Constants
-###
+# Constants
 
-sys.setrecursionlimit(100000);
-###
-poiTypes = ('bar', 'restaurant');
+sys.setrecursionlimit(100000)
+poiTypes = ('bar', 'restaurant')
 poiType2Skip = {
     'bar' : (358, 409, 466),
     'restaurant' : (940, 1050),
-};
-###
+}
 # Walking constants
-###
-radiansPerDegree = pi / 180;
-radiusOfEarth = 6371e3;
-meterPerMin = 1.4 * 60;
-meterPerLat = 111194.;
-meterPerLng = 87882.;
-###
+radiansPerDegree = pi / 180
+radiusOfEarth = 6371e3
+meterPerMin = 1.4 * 60
+meterPerLat = 111194.
+meterPerLng = 87882.
 worldLimits = {
     'latitudeMinimum' : 37.708,
     'latitudeMaximum' : 37.8125,
     'longitudeMinimum' : -122.515,
     'longitudeMaximum' : -122.355,
-};
-###
-maximumTreePerMeter = 10;
-maximumDistanceReduction = 0.3;
+}
+maximumTreePerMeter = 10
+maximumDistanceReduction = 0.3
 
-###
-### Classes
-###
+# Classes
 
 class Address:
     def __init__(self, *args):
-        self.address, self.latitude, self.longitude = args;
-        ###
-        return;
+        self.address, self.latitude, self.longitude = args
+
+        return
 
 class Tree:
-    '''https://data.sfgov.org/Public-Works/Street-Tree-List/tkzw-k3nq''';
+    '''https://data.sfgov.org/Public-Works/Street-Tree-List/tkzw-k3nq'''
     def __init__(self, *args):
         if 4 == len(args):
-            ###
-            self.id, self.variety, latitude, longitude = args;
-            self.latitude = self.longitude = None;
+
+            self.id, self.variety, latitude, longitude = args
+            self.latitude = self.longitude = None
             if latitude is not None and longitude is not None:
-                self.latitude = float(latitude);
-                self.longitude = float(longitude);
+                self.latitude = float(latitude)
+                self.longitude = float(longitude)
         elif 5 == len(args):
-            junk, id, variety, latitude, longitude = args;
-            ###
-            self.id = int(id);
-            self.variety = variety.decode('latin-1');
-            self.latitude = float(latitude);
-            self.longitude = float(longitude);
-        ###
-        return;
+            junk, id, variety, latitude, longitude = args
+
+            self.id = int(id)
+            self.variety = variety.decode('latin-1')
+            self.latitude = float(latitude)
+            self.longitude = float(longitude)
+
+        return
 
 class POI:
-    '''http://www.yelp.com/developers/documentation/v2/search_api#rValue''';
+    '''http://www.yelp.com/developers/documentation/v2/search_api#rValue'''
     def __init__(self, *args):
         if 4 == len(args):
-            json, poiType, nodeIds, offsets = args;
-            ###
-            self.id = POIHash(json, poiType);
-            self.poiType = poiType;
-            self.name = json.get('name');
-            ###
-            self.nodeIds = nodeIds;
-            self.offsets = offsets;
-            ###
-            location = json.get('location');
-            latlng = location.get('latlng');
-            ###
-            self.latitude = self.longitude = None;
+            json, poiType, nodeIds, offsets = args
+
+            self.id = POIHash(json, poiType)
+            self.poiType = poiType
+            self.name = json.get('name')
+
+            self.nodeIds = nodeIds
+            self.offsets = offsets
+
+            location = json.get('location')
+            latlng = location.get('latlng')
+
+            self.latitude = self.longitude = None
             if latlng is not None:
-                self.latitude = latlng[0];
-                self.longitude = latlng[1];
-            ###
-            self.address = location.get('address');
-            self.city = location.get('city');
-            self.state = location.get('state_code');
-            ###
-            self.imageUrl = json.get('image_url');
-            self.yelpUrl = json.get('url');
-            ###
+                self.latitude = latlng[0]
+                self.longitude = latlng[1]
+
+            self.address = location.get('address')
+            self.city = location.get('city')
+            self.state = location.get('state_code')
+
+            self.imageUrl = json.get('image_url')
+            self.yelpUrl = json.get('url')
+
         elif 12 == len(args):
-            id, poiType, name, nodeIds, offsets, latitude, longitude, address, city, state, imageUrl, yelpUrl = args;
-            ###
-            self.id = int(id);
-            self.poiType = poiType.decode('latin-1');
-            self.name = name.decode('latin-1');
-            self.nodeIds = bool(nodeIds) and list(int(nodeId) for nodeId in nodeIds.decode('latin-1').split(',') if nodeId) or [];
-            self.offsets = bool(offsets) and list(float(offset) for offset in offsets.decode('latin-1').split(',') if offset) or [];
-            self.latitude = float(latitude);
-            self.longitude = float(longitude);
-            self.address = address.decode('latin-1');
-            self.city = city.decode('latin-1');
-            self.state = state.decode('latin-1');
-            self.imageUrl = imageUrl.decode('latin-1');
-            self.yelpUrl = yelpUrl.decode('latin-1');
-        ###
-        return;
-    ###
+            id, poiType, name, nodeIds, offsets, latitude, longitude, address, city, state, imageUrl, yelpUrl = args
+
+            self.id = int(id)
+            self.poiType = poiType.decode('latin-1')
+            self.name = name.decode('latin-1')
+            self.nodeIds = bool(nodeIds) and list(int(nodeId) for nodeId in nodeIds.decode('latin-1').split(',') if nodeId) or []
+            self.offsets = bool(offsets) and list(float(offset) for offset in offsets.decode('latin-1').split(',') if offset) or []
+            self.latitude = float(latitude)
+            self.longitude = float(longitude)
+            self.address = address.decode('latin-1')
+            self.city = city.decode('latin-1')
+            self.state = state.decode('latin-1')
+            self.imageUrl = imageUrl.decode('latin-1')
+            self.yelpUrl = yelpUrl.decode('latin-1')
+
+        return
+
     def __hash__(self):
-        return self.id;
+        return self.id
 
 class Node:
-    '''http://wiki.openstreetmap.org/wiki/Node''';
+    '''http://wiki.openstreetmap.org/wiki/Node'''
     def __init__(self, *args):
         if 1 == len(args):
-            nodeXml, = args;
-            ###
-            self.id = self.longitude = self.latitude = self.label = None;
-            ###
+            nodeXml, = args
+
+            self.id = self.longitude = self.latitude = self.label = None
+
             for key, value in nodeXml.attrib.items():
                 if 'id' == key:
-                    self.id = int(value);
+                    self.id = int(value)
                 elif 'lat' == key:
-                    self.latitude = float(value);
+                    self.latitude = float(value)
                 elif 'lon' == key:
-                    self.longitude = float(value);
-            ###
-            self.count = 0;
-            ###
-            self.nodeIds = [];
-            self.edgeIds = [];
-            self.lengths = [];
-            self.poiIds = [];
+                    self.longitude = float(value)
+
+            self.count = 0
+
+            self.nodeIds = []
+            self.edgeIds = []
+            self.lengths = []
+            self.poiIds = []
         elif 8 == len(args):
-            ###
-            id, isIntersection, latitude, longitude, nodeIds, edgeIds, lengths, poiIds = args;
-            ###
-            self.id = int(id);
-            self.isIntersection = bool(isIntersection);
-            self.latitude = float(latitude);
-            self.longitude = float(longitude);
-            self.nodeIds = bool(nodeIds) and list(int(nodeId) for nodeId in nodeIds.decode('latin-1').split(',') if nodeId) or [];
-            self.edgeIds = bool(edgeIds) and list(int(edgeId) for edgeId in edgeIds.decode('latin-1').split(',') if edgeId) or [];
-            self.lengths = bool(lengths) and list(float(length) for length in lengths.decode('latin-1').split(',') if length) or [];
-            self.poiIds = bool(poiIds) and list(int(poiId) for poiId in poiIds.decode('latin-1').split(',') if poiId) or [];
-        ###
-        return;
-    ###
+
+            id, isIntersection, latitude, longitude, nodeIds, edgeIds, lengths, poiIds = args
+
+            self.id = int(id)
+            self.isIntersection = bool(isIntersection)
+            self.latitude = float(latitude)
+            self.longitude = float(longitude)
+            self.nodeIds = bool(nodeIds) and list(int(nodeId) for nodeId in nodeIds.decode('latin-1').split(',') if nodeId) or []
+            self.edgeIds = bool(edgeIds) and list(int(edgeId) for edgeId in edgeIds.decode('latin-1').split(',') if edgeId) or []
+            self.lengths = bool(lengths) and list(float(length) for length in lengths.decode('latin-1').split(',') if length) or []
+            self.poiIds = bool(poiIds) and list(int(poiId) for poiId in poiIds.decode('latin-1').split(',') if poiId) or []
+
+        return
+
     def __sub__(self, other):
-        return LatLngDistance(self.latitude, self.longitude, other.latitude, other.longitude);
-    ###
+        return LatLngDistance(self.latitude, self.longitude, other.latitude, other.longitude)
+
     def Count(self):
-        self.count += 1;
-        return;
+        self.count += 1
+        return
 
 class Edge:
-    '''http://wiki.openstreetmap.org/wiki/Way''';
+    '''http://wiki.openstreetmap.org/wiki/Way'''
     def __init__(self, *args):
         if 2 == len(args):
-            xml, id2Node = args;
-            ###
-            self.id = int(xml.attrib.get('id'));
-            ###
-            self.name = None;
-            for tag in xml.iter('tag'):
-                key, value = (tag.attrib.get(moniker) for moniker in ('k', 'v'));
-                if 'name' == key:
-                    self.name = value;
-            ###
-            self.nodeIds = [int(nodeXml.attrib.get('ref')) for nodeXml in xml.iter('nd')];
-            ###
-            # Touch each sub-node
-            ###
-            for nodeId in set(self.nodeIds):
-                ###
-                # Kick out unknown nodes
-                ###
-                if nodeId not in id2Node:
-                    continue;
-                ###
-                id2Node.get(nodeId).Count();
-            ###
-            self.treeCount = 0;
-        elif 4 == len(args):
-            id, name, nodeIds, treeCount = args;
-            ###
-            self.id = int(id);
-            self.name = name != b'None' and name.decode('latin-1') or '';
-            self.nodeIds = bool(nodeIds) and list(int(nodeId) for nodeId in nodeIds.decode('latin-1').split(',') if nodeId) or [];
-            self.treeCount = treeCount;
-        elif 5 == len(args):
-            junk, self.id, self.name, self.nodeIds, self.treeCount = args;
-        ###
-        return;
+            xml, id2Node = args
 
-###
-### Functions
-###
+            self.id = int(xml.attrib.get('id'))
+
+            self.name = None
+            for tag in xml.iter('tag'):
+                key, value = (tag.attrib.get(moniker) for moniker in ('k', 'v'))
+                if 'name' == key:
+                    self.name = value
+
+            self.nodeIds = [int(nodeXml.attrib.get('ref')) for nodeXml in xml.iter('nd')]
+
+            # Touch each sub-node
+
+            for nodeId in set(self.nodeIds):
+
+                # Kick out unknown nodes
+
+                if nodeId not in id2Node:
+                    continue
+
+                id2Node.get(nodeId).Count()
+
+            self.treeCount = 0
+        elif 4 == len(args):
+            id, name, nodeIds, treeCount = args
+
+            self.id = int(id)
+            self.name = name != b'None' and name.decode('latin-1') or ''
+            self.nodeIds = bool(nodeIds) and list(int(nodeId) for nodeId in nodeIds.decode('latin-1').split(',') if nodeId) or []
+            self.treeCount = treeCount
+        elif 5 == len(args):
+            junk, self.id, self.name, self.nodeIds, self.treeCount = args
+
+        return
+
+# Functions
 
 def PrintNow(*arguments, sep = '\n', end = '\n'):
-    from sys import stdout;
-    ###
-    print(*arguments, sep = sep, end = end);
-    stdout.flush();
-    ###
-    return;
+    from sys import stdout
+
+    print(*arguments, sep = sep, end = end)
+    stdout.flush()
+
+    return
 
 def GeoJSON(thing):
-    '''http://en.wikipedia.org/wiki/GeoJSON''';
+    '''http://en.wikipedia.org/wiki/GeoJSON'''
     if isinstance(thing, list):
-        return [GeoJSON(element) for element in thing];
-    ###
+        return [GeoJSON(element) for element in thing]
+
     geoJSON = {
         'type' : 'Feature',
         'geometry' : {
             'type' : 'Point',
             'coordinates' : [thing.longitude, thing.latitude],
         }
-    };
+    }
     if isinstance(thing, Address):
         geoJSON.update({
             'properties' : {
@@ -248,14 +233,14 @@ def GeoJSON(thing):
                     'iconSize' : [30, 30],
                 },
             }
-        });
+        })
     elif isinstance(thing, POI):
         iconUrl = {
             'bar' : './static/img/bar-24.svg',
             'park' : './static/img/park-24.svg',
             'restaurant' : './static/img/restaurant-24.svg',
-        };
-        ###
+        }
+
         geoJSON.update({
             'properties' : {
                 'title' : thing.name,
@@ -267,7 +252,7 @@ def GeoJSON(thing):
                 'imageUrl' : thing.imageUrl,
                 'yelpUrl' : thing.yelpUrl,
             }
-        });
+        })
     elif isinstance(thing, Tree):
         geoJSON.update({
             'properties' : {
@@ -277,761 +262,757 @@ def GeoJSON(thing):
                     'iconSize' : [12, 12],
                 }
             }
-        });
-    ###
-    return geoJSON;
+        })
+
+    return geoJSON
 
 def POIHash(json, poiType):
-    latlng = json.get('location').get('latlng');
-    ###
-    return hash((json.get('id'), poiType, latlng and tuple(latlng) or ())) // 1000;
+    latlng = json.get('location').get('latlng')
 
-###
-### Pre MySQL
-###
+    return hash((json.get('id'), poiType, latlng and tuple(latlng) or ())) // 1000
+
+# Pre MySQL
 
 def ReadOsmFile(osmFileName):
-    '''http://wiki.openstreetmap.org/wiki/OSM_XML''';
-    import xml.etree.ElementTree as ET;
-    ###
-    PrintNow('Reading {:s} ... '.format(osmFileName), end = '');
-    root = ET.parse(osmFileName).getroot();
-    PrintNow('done');
-    ###
-    return root;
+    '''http://wiki.openstreetmap.org/wiki/OSM_XML'''
+    import xml.etree.ElementTree as ET
+
+    PrintNow('Reading {:s} ... '.format(osmFileName), end = '')
+    root = ET.parse(osmFileName).getroot()
+    PrintNow('done')
+
+    return root
 
 def InBounds(location):
     return worldLimits.get('latitudeMinimum') <= location.latitude <= worldLimits.get('latitudeMaximum') and \
-           worldLimits.get('longitudeMinimum') <= location.longitude <= worldLimits.get('longitudeMaximum');
+           worldLimits.get('longitudeMinimum') <= location.longitude <= worldLimits.get('longitudeMaximum')
 
 def ParseOSMNodes(osmRoot):
-    PrintNow('Parsing OSM nodes ... ', end = '');
-    id2Node = [Node(child) for child in osmRoot if 'node' == child.tag];
-    ###
+    PrintNow('Parsing OSM nodes ... ', end = '')
+    id2Node = [Node(child) for child in osmRoot if 'node' == child.tag]
+
     # Throw out nodes which are out of bounds
-    ###
-    id2Node = {node.id : node for node in id2Node if InBounds(node)};
-    PrintNow('found {:d}'.format(len(id2Node)));
-    ###
-    return id2Node;
+
+    id2Node = {node.id : node for node in id2Node if InBounds(node)}
+    PrintNow('found {:d}'.format(len(id2Node)))
+
+    return id2Node
 
 def ParseOSMWays(osmRoot, id2Node):
-    PrintNow('Parsing OSM ways ... ', end = '');
-    id2Edge = [Edge(child, id2Node) for child in osmRoot if 'way' == child.tag];
-    id2Edge = {edge.id : edge for edge in id2Edge};
-    PrintNow('found {:d}'.format(len(id2Edge)));
-    ###
+    PrintNow('Parsing OSM ways ... ', end = '')
+    id2Edge = [Edge(child, id2Node) for child in osmRoot if 'way' == child.tag]
+    id2Edge = {edge.id : edge for edge in id2Edge}
+    PrintNow('found {:d}'.format(len(id2Edge)))
+
     # Clean up edge names (non-latin-1 and ")
-    ###
+
     for edge in id2Edge.values():
-        edge.name = edge.name and edge.name.replace('–', '-').replace('"', '');
-    ###
-    return id2Edge;
+        edge.name = edge.name and edge.name.replace('–', '-').replace('"', '')
+
+    return id2Edge
 
 def LinkNodes(nodeOne, nodeTwo, edge, id2Node):
-    ###
+
     # Attach node
-    ###
-    nodeOne.nodeIds.append(nodeTwo.id);
-    nodeTwo.nodeIds.append(nodeOne.id);
-    ###
+
+    nodeOne.nodeIds.append(nodeTwo.id)
+    nodeTwo.nodeIds.append(nodeOne.id)
+
     # Attach edge
-    ###
-    nodeOne.edgeIds.append(edge.id);
-    nodeTwo.edgeIds.append(edge.id);
-    ###
+
+    nodeOne.edgeIds.append(edge.id)
+    nodeTwo.edgeIds.append(edge.id)
+
     # Calculate length
-    ###
-    index = edge.nodeIds.index(nodeOne.id);
-    jndex = edge.nodeIds.index(nodeTwo.id);
+
+    index = edge.nodeIds.index(nodeOne.id)
+    jndex = edge.nodeIds.index(nodeTwo.id)
     if index > jndex:
-        index, jndex = jndex, index;
-    nodeIds = [nodeId for nodeId in edge.nodeIds[index : jndex + 1] if nodeId in id2Node];
-    assert(len(nodeIds));
-    length = sum(id2Node.get(nodeIds[index + 1]) - id2Node.get(nodeIds[index]) for index in range(len(nodeIds) - 1));
-    ###
+        index, jndex = jndex, index
+    nodeIds = [nodeId for nodeId in edge.nodeIds[index : jndex + 1] if nodeId in id2Node]
+    assert(len(nodeIds))
+    length = sum(id2Node.get(nodeIds[index + 1]) - id2Node.get(nodeIds[index]) for index in range(len(nodeIds) - 1))
+
     # Attach it
-    ###
-    nodeOne.lengths.append(length);
-    nodeTwo.lengths.append(length);
-    ###
-    return;
+
+    nodeOne.lengths.append(length)
+    nodeTwo.lengths.append(length)
+
+    return
 
 def BuildGraph(id2Node, id2Edge):
-    PrintNow('Building graph ... ', end = '');
-    intersectionIds = set();
-    ###
+    PrintNow('Building graph ... ', end = '')
+    intersectionIds = set()
+
     # Iterate over edges
-    ###
+
     for edge in id2Edge.values():
-        intersections = [];
-        ###
+        intersections = []
+
         # ... and their sub-nodes
-        ###
+
         for nodeId in edge.nodeIds:
-            node = id2Node.get(nodeId);
-            ###
+            node = id2Node.get(nodeId)
+
             # Each node which is shared among multiple edges is an intersection
-            ###
+
             if node is not None and node.count > 1:
-                intersections.append(node);
-                intersectionIds.update((nodeId, ));
-        ###
+                intersections.append(node)
+                intersectionIds.update((nodeId, ))
+
         # Link intersection nodes
-        ###
-        prev = None;
+
+        prev = None
         for curr in intersections:
             if prev is not None and prev.id != curr.id:
-                LinkNodes(prev, curr, edge, id2Node);
-            prev = curr;
-    PrintNow('found {:d} intersections'.format(len(intersectionIds)));
-    ###
-    return;
+                LinkNodes(prev, curr, edge, id2Node)
+            prev = curr
+    PrintNow('found {:d} intersections'.format(len(intersectionIds)))
+
+    return
 
 def FloodFill(startId, id2Node, label):
-    '''http://en.wikipedia.org/wiki/Flood_fill''';
-    ###
+    '''http://en.wikipedia.org/wiki/Flood_fill'''
+
     # Initialize
-    ###
-    count = 0;
-    node = id2Node.get(startId);
-    ###
+
+    count = 0
+    node = id2Node.get(startId)
+
     # If this node is unlabeled ...
-    ###
+
     if node.label is None:
-        ###
+
         # ... count it ...
-        ###
-        node.label = label;
-        count += 1;
-        ###
+
+        node.label = label
+        count += 1
+
         # ... and recurse to its neighbors
-        ###
+
         for nodeId in node.nodeIds:
-            ###
+
             # The count is passed up the tree to the initiating node
-            ###
-            count += FloodFill(nodeId, id2Node, label);
-    ###
-    return count;
+
+            count += FloodFill(nodeId, id2Node, label)
+
+    return count
 
 def TrimGraph(id2Node, id2Edge):
-    PrintNow('Finding largest subgraph ... ', end = '');
-    ###
+    PrintNow('Finding largest subgraph ... ', end = '')
+
     # Label every node according to the subgraph to which it belongs
-    ###
-    label2Count = {};
-    label = 0;
+
+    label2Count = {}
+    label = 0
     for nodeId in id2Node:
-        count = FloodFill(nodeId, id2Node, label);
+        count = FloodFill(nodeId, id2Node, label)
         if count > 2:
-            label2Count[label] = count;
-        ###
-        label += 1;
-    ###
+            label2Count[label] = count
+
+        label += 1
+
     # Find the largest subgraph
-    ###
-    graphLabel = maxCount = 0;
+
+    graphLabel = maxCount = 0
     for label, count in label2Count.items():
         if count >= maxCount:
-            graphLabel, maxCount = label, count;
-    ###
+            graphLabel, maxCount = label, count
+
     # Gather IDs from the largest subgraph
-    ###
-    graphIds = [nodeId for nodeId, node in id2Node.items() if node.label == graphLabel];
-    PrintNow('contains {:d} nodes'.format(len(graphIds)));
-    ###
+
+    graphIds = [nodeId for nodeId, node in id2Node.items() if node.label == graphLabel]
+    PrintNow('contains {:d} nodes'.format(len(graphIds)))
+
     # Gather the IDs from other subgraphs and trim them
-    ###
-    trimNodeIds = [nodeId for nodeId, node in id2Node.items() if node.label in label2Count and node.label!= graphLabel];
-    ###
+
+    trimNodeIds = [nodeId for nodeId, node in id2Node.items() if node.label in label2Count and node.label!= graphLabel]
+
     for nodeId in trimNodeIds:
-        id2Node.pop(nodeId);
-    ###
+        id2Node.pop(nodeId)
+
     # Trim edges
-    ###
-    trimEdgeIds = [edge.id for edge in id2Edge.values() if not any(nodeId in id2Node for nodeId in edge.nodeIds)];
+
+    trimEdgeIds = [edge.id for edge in id2Edge.values() if not any(nodeId in id2Node for nodeId in edge.nodeIds)]
     for edgeId in trimEdgeIds:
-        id2Edge.pop(edgeId);
-    PrintNow('Graph trimmed to {:d} nodes and {:d} edges'.format(len(id2Node), len(id2Edge)));
-    ###
-    return graphIds;
+        id2Edge.pop(edgeId)
+    PrintNow('Graph trimmed to {:d} nodes and {:d} edges'.format(len(id2Node), len(id2Edge)))
+
+    return graphIds
 
 def SimpleDistance(latitude1, longitude1, latitude2, longitude2):
-    return ((meterPerLat * (latitude1 - latitude2)) ** 2 + (meterPerLng * (longitude1 - longitude2)) ** 2);
+    return ((meterPerLat * (latitude1 - latitude2)) ** 2 + (meterPerLng * (longitude1 - longitude2)) ** 2)
 
 def ZeroLink(nodeIds, id2Node, id2Edge):
-    ###
+
     # Find unique edgeId
-    ###
-    edgeId = max(id2Edge);
-    ###
+
+    edgeId = max(id2Edge)
+
     # Iterate over every pairing
-    ###
+
     for index in range(len(nodeIds)):
-        nodeId = nodeIds[index];
-        iNode = id2Node.get(nodeId);
-        ###
+        nodeId = nodeIds[index]
+        iNode = id2Node.get(nodeId)
+
         for jndex in range(index + 1, len(nodeIds)):
-            nodeJd = nodeIds[jndex];
-            jNode = id2Node.get(nodeJd);
-            ###
+            nodeJd = nodeIds[jndex]
+            jNode = id2Node.get(nodeJd)
+
             # Attach nodes
-            ###
-            iNode.nodeIds.append(nodeJd);
-            jNode.nodeIds.append(nodeId);
-            ###
+
+            iNode.nodeIds.append(nodeJd)
+            jNode.nodeIds.append(nodeId)
+
             # Create fake edge and attach it
-            ###
-            edgeId += 1;
-            id2Edge[edgeId] = Edge(False, edgeId, 'Edge to close graph between {:d} and {:d}'.format(nodeId, nodeJd), [nodeId, nodeJd], 0);
-            ###
-            iNode.edgeIds.append(edgeId);
-            jNode.edgeIds.append(edgeId);
-            ###
+
+            edgeId += 1
+            id2Edge[edgeId] = Edge(False, edgeId, 'Edge to close graph between {:d} and {:d}'.format(nodeId, nodeJd), [nodeId, nodeJd], 0)
+
+            iNode.edgeIds.append(edgeId)
+            jNode.edgeIds.append(edgeId)
+
             # Attach length
-            ###
-            iNode.lengths.append(0);
-            jNode.lengths.append(0);
-    ###
-    return;
+
+            iNode.lengths.append(0)
+            jNode.lengths.append(0)
+
+    return
 
 def CloseGraph(id2Node, id2Edge, graphIds):
-    PrintNow('Closing graph ... ', end = '');
-    ###
+    PrintNow('Closing graph ... ', end = '')
+
     # Order nodes by position
-    ###
-    graphIds = sorted(graphIds, key = lambda graphId: (id2Node.get(graphId).latitude, id2Node.get(graphId).longitude));
-    ###
+
+    graphIds = sorted(graphIds, key = lambda graphId: (id2Node.get(graphId).latitude, id2Node.get(graphId).longitude))
+
     # Iterate over graph nodes
-    ###
-    threshold = 5;
-    latlng2NodeIds = {};
+
+    threshold = 5
+    latlng2NodeIds = {}
     for nodeId in graphIds:
-        node = id2Node.get(nodeId);
-        latitude, longitude = node.latitude, node.longitude;
-        match = False;
+        node = id2Node.get(nodeId)
+        latitude, longitude = node.latitude, node.longitude
+        match = False
         for latlng in latlng2NodeIds:
             if SimpleDistance(latlng[0], latlng[1], latitude, longitude) < threshold:
-                match = True;
-                break;
-        ###
+                match = True
+                break
+
         if match:
-            latlng2NodeIds[latlng].append(node.id);
+            latlng2NodeIds[latlng].append(node.id)
         else:
-            latlng2NodeIds[(latitude, longitude)] = [node.id];
-    ###
-    count = 0;
+            latlng2NodeIds[(latitude, longitude)] = [node.id]
+
+    count = 0
     for latlng, nodeIds in latlng2NodeIds.items():
         if len(nodeIds) > 1:
-            count += 1;
-            ZeroLink(nodeIds, id2Node, id2Edge);
-    ###
-    PrintNow('closed {:d} disconnections.'.format(count));
-    ###
-    return;
+            count += 1
+            ZeroLink(nodeIds, id2Node, id2Edge)
+
+    PrintNow('closed {:d} disconnections.'.format(count))
+
+    return
 
 def NearestNode(latitude, longitude, nodeIds, id2Node):
-    minimumId, minimumDistance = None, 1e9;
+    minimumId, minimumDistance = None, 1e9
     for nodeId in nodeIds:
-        node = id2Node.get(nodeId);
-        distance = SimpleDistance(latitude, longitude, node.latitude, node.longitude);
+        node = id2Node.get(nodeId)
+        distance = SimpleDistance(latitude, longitude, node.latitude, node.longitude)
         if distance < minimumDistance:
-            minimumId, minimumDistance = nodeId, distance;
-    ###
-    return minimumId, minimumDistance ** 0.5;
+            minimumId, minimumDistance = nodeId, distance
+
+    return minimumId, minimumDistance ** 0.5
 
 def SnapPOIs(id2Node, nodeIds, datDirectory):
-    ###
+
     # Grab dog-friendly POI's
-    ###
-    dogOKFileName = '{}/dogOKs.dat'.format(datDirectory);
+
+    dogOKFileName = '{}/dogOKs.dat'.format(datDirectory)
     with open(dogOKFileName) as f:
-        dogOKs = [dogOK.strip() for dogOK in f.readlines()];
-    ###
+        dogOKs = [dogOK.strip() for dogOK in f.readlines()]
+
     # Iterate over POI types
-    ###
-    id2Poi = {};
+
+    id2Poi = {}
     for poiType in poiTypes:
-        PrintNow('Snapping {} to intersections ...'.format(poiType));
-        ###
+        PrintNow('Snapping {} to intersections ...'.format(poiType))
+
         # POI specifics
-        ###
-        skip = poiType2Skip.get(poiType);
-        ###
+
+        skip = poiType2Skip.get(poiType)
+
         # Read POI .json
-        ###
-        jsonFileName = '{}/{}.json'.format(datDirectory, poiType);
-        PrintNow('Reading {:s} ... '.format(jsonFileName), end = '');
+
+        jsonFileName = '{}/{}.json'.format(datDirectory, poiType)
+        PrintNow('Reading {:s} ... '.format(jsonFileName), end = '')
         with open(jsonFileName, 'r') as f:
-            json = JSONLoad(f.read());
-        PrintNow('done');
-        ###
+            json = JSONLoad(f.read())
+        PrintNow('done')
+
         # Iterate over businesses
-        ###
-        businesses = json.get('businesses');
-        length = len(businesses);
-        ###
+
+        businesses = json.get('businesses')
+        length = len(businesses)
+
         for index in range(length):
-            ###
+
             # Skip junk data and dog-unfriendly
-            ###
-            yelpUrl = businesses[index].get('url');
+
+            yelpUrl = businesses[index].get('url')
             if index in skip or yelpUrl not in dogOKs:
-                continue;
-            ###
-            json = businesses[index];
-            ###
-            poiId = POIHash(json, poiType);
-            latlng = json.get('location').get('latlng');
-            ###
+                continue
+
+            json = businesses[index]
+
+            poiId = POIHash(json, poiType)
+            latlng = json.get('location').get('latlng')
+
             # Kick out ill-defined POI's
-            ###
+
             if latlng is None:
-                continue;
-            ###
+                continue
+
             # Attach ...
-            ###
-            PrintNow('{:4d}/{:4d}:\t{} .. '.format(index + 1, length, json.get('name')), end = '');
-            ###
-            latitude, longitude = latlng;
-            nodeId, offset = NearestNode(latitude, longitude, nodeIds, id2Node);
-            ###
-            PrintNow('to {}'.format(nodeId));
-            ###
+
+            PrintNow('{:4d}/{:4d}:\t{} .. '.format(index + 1, length, json.get('name')), end = '')
+
+            latitude, longitude = latlng
+            nodeId, offset = NearestNode(latitude, longitude, nodeIds, id2Node)
+
+            PrintNow('to {}'.format(nodeId))
+
             # ... POI onto node ...
-            ###
-            id2Node.get(nodeId).poiIds.append(poiId);
-            ###
+
+            id2Node.get(nodeId).poiIds.append(poiId)
+
             # ... and node onto POI
-            ###
+
             if poiId in id2Poi:
-                id2Poi.get(poiId).nodeIds.append(nodeId);
-                id2Poi.get(poiId).offsets.append(offset);
+                id2Poi.get(poiId).nodeIds.append(nodeId)
+                id2Poi.get(poiId).offsets.append(offset)
             else:
-                id2Poi[poiId] = POI(json, poiType, [nodeId], [offset]);
-    ###
-    PrintNow('Added {:d} POIs'.format(len(id2Poi)));
-    ###
-    return id2Poi;
+                id2Poi[poiId] = POI(json, poiType, [nodeId], [offset])
+
+    PrintNow('Added {:d} POIs'.format(len(id2Poi)))
+
+    return id2Poi
 
 def SnapTrees(id2Node, id2Edge, graphIds, datDirectory):
-    id2Tree = {};
-    PrintNow('Snapping trees to edges ...');
-    ###
+    id2Tree = {}
+    PrintNow('Snapping trees to edges ...')
+
     # Map nodeId to edgeIds
-    ###
-    nodeId2EdgeIds = {};
+
+    nodeId2EdgeIds = {}
     for edgeId, edge in id2Edge.items():
-        ###
+
         # Kick out non-subgraph edges
-        ###
+
         if not any(nodeId in graphIds for nodeId in edge.nodeIds):
-            continue;
-        ###
+            continue
+
         for nodeId in edge.nodeIds:
-            ###
+
             # Kick out missing nodes
-            ###
+
             if nodeId not in id2Node:
-                continue;
-            ###
+                continue
+
             try:
-                nodeId2EdgeIds[nodeId].append(edgeId);
+                nodeId2EdgeIds[nodeId].append(edgeId)
             except KeyError:
-                nodeId2EdgeIds[nodeId] = [edgeId];
-    ###
+                nodeId2EdgeIds[nodeId] = [edgeId]
+
     # Order nodes by position
-    ###
-    nodeIds = sorted(nodeId2EdgeIds.keys(), key = lambda nodeId: (id2Node.get(nodeId).latitude, id2Node.get(nodeId).longitude));
-    ###
+
+    nodeIds = sorted(nodeId2EdgeIds.keys(), key = lambda nodeId: (id2Node.get(nodeId).latitude, id2Node.get(nodeId).longitude))
+
     # Read tree .json
-    ###
-    jsonFileName = '{}/{}.json'.format(datDirectory, treeFileName);
-    PrintNow('Reading {:s} ... '.format(jsonFileName), end = '');
+
+    jsonFileName = '{}/{}.json'.format(datDirectory, treeFileName)
+    PrintNow('Reading {:s} ... '.format(jsonFileName), end = '')
     with open(jsonFileName, 'r') as f:
-        json = JSONLoad(f.read());
-    PrintNow('done');
-    ###
+        json = JSONLoad(f.read())
+    PrintNow('done')
+
     # Iterate over trees
-    ###
-    trees = json.get('data');
-    ###
+
+    trees = json.get('data')
+
     # Order trees by position
-    ###
-    trees = sorted((tree for tree in trees if tree[23] is not None and tree[24] is not None), key = lambda tree: (tree[23], tree[24]));
-    ###
-    length = len(trees);
-    prevLatLng, prevNodeId = (None, None), None;
+
+    trees = sorted((tree for tree in trees if tree[23] is not None and tree[24] is not None), key = lambda tree: (tree[23], tree[24]))
+
+    length = len(trees)
+    prevLatLng, prevNodeId = (None, None), None
     for index in range(length):
-        treeList = trees[index];
-        ###
-        treeId = treeList[0];
-        variety = treeList[10];
-        latitude, longitude = treeList[23 : 25];
-        ###
+        treeList = trees[index]
+
+        treeId = treeList[0]
+        variety = treeList[10]
+        latitude, longitude = treeList[23 : 25]
+
         # Kick out ill-defined or repeat trees
-        ###
+
         if latitude is None or longitude is None:
-            continue;
-        ###
+            continue
+
         # Snap to a node ...
-        ###
-        PrintNow('{:5d}/{:5d} .. '.format(index + 1, length, treeList[10][ : 10]), end = '');
-        ###
-        id2Tree[treeId] = Tree(treeId, variety, latitude, longitude);
-        latitude, longitude = float(latitude), float(longitude);
+
+        PrintNow('{:5d}/{:5d} .. '.format(index + 1, length, treeList[10][ : 10]), end = '')
+
+        id2Tree[treeId] = Tree(treeId, variety, latitude, longitude)
+        latitude, longitude = float(latitude), float(longitude)
         if prevLatLng == (latitude, longitude):
-            nodeId = prevNodeId;
+            nodeId = prevNodeId
         else:
-            nodeId, junk = NearestNode(latitude, longitude, nodeIds, id2Node);
-            ###
-            prevLatLng, prevNodeId = (latitude, longitude), nodeId;
-        ###
+            nodeId, junk = NearestNode(latitude, longitude, nodeIds, id2Node)
+
+            prevLatLng, prevNodeId = (latitude, longitude), nodeId
+
         # ... grab its edges ...
-        ###
-        edgeIds = nodeId2EdgeIds.get(nodeId);
-        ###
+
+        edgeIds = nodeId2EdgeIds.get(nodeId)
+
         # ... and increment them
-        ###
-        PrintNow('to {}'.format(','.join(str(edgeId) for edgeId in edgeIds)));
+
+        PrintNow('to {}'.format(','.join(str(edgeId) for edgeId in edgeIds)))
         for edgeId in edgeIds:
-            id2Edge.get(edgeId).treeCount += 1;
-    ###
-    PrintNow('Added {:d} trees'.format(len(id2Tree)));
-    ###
-    return id2Tree;
+            id2Edge.get(edgeId).treeCount += 1
+
+    PrintNow('Added {:d} trees'.format(len(id2Tree)))
+
+    return id2Tree
 
 def CreateTables(id2Node, id2Edge, id2Poi, id2Tree, graphIds):
-    ###
+
     # Helper
-    ###
+
     def List2Str(l):
-        return l and ','.join(str(e) for e in l if e) or '';
-    ###
+        return l and ','.join(str(e) for e in l if e) or ''
+
     # Initialize
-    ###
-    connection = MySqlConnect(user = 'root', port = 3306, db = mySqlDataBase);
-    cursor = connection.cursor();
-    ###
+
+    connection = MySqlConnect(user = 'root', port = 3306, db = mySqlDataBase)
+    cursor = connection.cursor()
+
     # Nodes
-    ###
-    PrintNow('Nodes TABLE ... ', end = '');
-    cursor.execute('''DROP TABLE Nodes ;''');
-    cursor.execute('''CREATE TABLE Nodes (id INT UNSIGNED NOT NULL PRIMARY KEY, isIntersection BOOLEAN, latitude DOUBLE NOT NULL, longitude DOUBLE NOT NULL, nodeIds TINYBLOB, edgeIds TINYBLOB, lengths TINYBLOB, poiIds TINYBLOB) ;''');
+
+    PrintNow('Nodes TABLE ... ', end = '')
+    cursor.execute('''DROP TABLE Nodes ;''')
+    cursor.execute('''CREATE TABLE Nodes (id INT UNSIGNED NOT NULL PRIMARY KEY, isIntersection BOOLEAN, latitude DOUBLE NOT NULL, longitude DOUBLE NOT NULL, nodeIds TINYBLOB, edgeIds TINYBLOB, lengths TINYBLOB, poiIds TINYBLOB) ;''')
     for node in id2Node.values():
-        cursor.execute('''INSERT INTO Nodes(id, isIntersection, latitude, longitude, nodeIds, edgeIds, lengths, poiIds) VALUES ({0.id:d}, {1:d}, {0.latitude:f}, {0.longitude:f}, "{2:s}", "{3:s}", "{4:s}", "{5:s}") ;'''.format(node, bool(node.id in graphIds), List2Str(node.nodeIds), List2Str(node.edgeIds), List2Str(node.lengths), List2Str(node.poiIds)));
-    connection.commit();
-    PrintNow('inserted {:d} rows'.format(len(id2Node)));
-    ###
+        cursor.execute('''INSERT INTO Nodes(id, isIntersection, latitude, longitude, nodeIds, edgeIds, lengths, poiIds) VALUES ({0.id:d}, {1:d}, {0.latitude:f}, {0.longitude:f}, "{2:s}", "{3:s}", "{4:s}", "{5:s}") ;'''.format(node, bool(node.id in graphIds), List2Str(node.nodeIds), List2Str(node.edgeIds), List2Str(node.lengths), List2Str(node.poiIds)))
+    connection.commit()
+    PrintNow('inserted {:d} rows'.format(len(id2Node)))
+
     # Edges
-    ###
-    PrintNow('Edges TABLE ... ', end = '');
-    cursor.execute('''DROP TABLE Edges ;''');
+
+    PrintNow('Edges TABLE ... ', end = '')
+    cursor.execute('''DROP TABLE Edges ;''')
     cursor.execute('''CREATE TABLE Edges (id INT UNSIGNED NOT NULL PRIMARY KEY, name TINYBLOB NOT NULL, nodeIds TINYBLOB NOT NULL, treeCount INT UNSIGNED NOT NULL) ;''')
     for edge in id2Edge.values():
-        cursor.execute('''INSERT INTO Edges(id, name, nodeIds, treeCount) VALUES ({0.id:d}, "{1:s}", "{2:s}", {0.treeCount:d}) ;'''.format(edge, edge.name, List2Str(edge.nodeIds)));
-    connection.commit();
-    PrintNow('inserted {:d} rows'.format(len(id2Edge)));
-    ###
+        cursor.execute('''INSERT INTO Edges(id, name, nodeIds, treeCount) VALUES ({0.id:d}, "{1:s}", "{2:s}", {0.treeCount:d}) ;'''.format(edge, edge.name, List2Str(edge.nodeIds)))
+    connection.commit()
+    PrintNow('inserted {:d} rows'.format(len(id2Edge)))
+
     # POIs
-    ###
-    PrintNow('POIs TABLE ... ', end = '');
-    cursor.execute('''DROP TABLE POIs ;''');
-    cursor.execute('''CREATE TABLE POIs (id BIGINT NOT NULL PRIMARY KEY, poiType TINYBLOB NOT NULL, name TINYBLOB NOT NULL, nodeIds TINYBLOB NOT NULL, offsets TINYBLOB NOT NULL, latitude DOUBLE NOT NULL, longitude DOUBLE NOT NULL, address TINYBLOB NOT NULL, city TINYBLOB NOT NULL, state TINYBLOB NOT NULL, imageUrl TINYBLOB NOT NULL, yelpUrl TINYBLOB NOT NULL) ;''');
-    count = 0;
+
+    PrintNow('POIs TABLE ... ', end = '')
+    cursor.execute('''DROP TABLE POIs ;''')
+    cursor.execute('''CREATE TABLE POIs (id BIGINT NOT NULL PRIMARY KEY, poiType TINYBLOB NOT NULL, name TINYBLOB NOT NULL, nodeIds TINYBLOB NOT NULL, offsets TINYBLOB NOT NULL, latitude DOUBLE NOT NULL, longitude DOUBLE NOT NULL, address TINYBLOB NOT NULL, city TINYBLOB NOT NULL, state TINYBLOB NOT NULL, imageUrl TINYBLOB NOT NULL, yelpUrl TINYBLOB NOT NULL) ;''')
+    count = 0
     for poi in id2Poi.values():
         if (poi.latitude is None or poi.longitude is None):
-            continue;
-        ###
-        count += 1;
-        cursor.execute('''INSERT INTO POIs(id, poiType, name, nodeIds, offsets, latitude, longitude, address, city, state, imageUrl, yelpUrl) VALUES ({0.id:d}, "{0.poiType:s}", "{1:s}", "{2:s}", "{3:s}", {0.latitude:f}, {0.longitude:f}, "{4:s}", "{0.city:s}", "{0.state:s}", "{0.imageUrl:s}", "{0.yelpUrl:s}") ;'''.format(poi, poi.name, List2Str(poi.nodeIds), List2Str(poi.offsets), poi.address[0]));
-    ###
-    connection.commit();
-    PrintNow('inserted {:d} rows'.format(count));
-    ###
+            continue
+
+        count += 1
+        cursor.execute('''INSERT INTO POIs(id, poiType, name, nodeIds, offsets, latitude, longitude, address, city, state, imageUrl, yelpUrl) VALUES ({0.id:d}, "{0.poiType:s}", "{1:s}", "{2:s}", "{3:s}", {0.latitude:f}, {0.longitude:f}, "{4:s}", "{0.city:s}", "{0.state:s}", "{0.imageUrl:s}", "{0.yelpUrl:s}") ;'''.format(poi, poi.name, List2Str(poi.nodeIds), List2Str(poi.offsets), poi.address[0]))
+
+    connection.commit()
+    PrintNow('inserted {:d} rows'.format(count))
+
     # Trees
-    ###
-    PrintNow('Trees TABLE .. ', end = '');
-    cursor.execute('''DROP TABLE Trees ;''');
-    cursor.execute('''CREATE TABLE Trees (id INT UNSIGNED NOT NULL PRIMARY KEY, variety TINYBLOB NOT NULL, latitude DOUBLE NOT NULL, longitude DOUBLE NOT NULL) ;''');
-    count = 0;
+
+    PrintNow('Trees TABLE .. ', end = '')
+    cursor.execute('''DROP TABLE Trees ;''')
+    cursor.execute('''CREATE TABLE Trees (id INT UNSIGNED NOT NULL PRIMARY KEY, variety TINYBLOB NOT NULL, latitude DOUBLE NOT NULL, longitude DOUBLE NOT NULL) ;''')
+    count = 0
     for tree in id2Tree.values():
         if (tree.latitude is None or tree.longitude is None):
-            continue;
-        ###
-        count += 1;
-        cursor.execute('''INSERT INTO Trees(id, variety, latitude, longitude) VALUES ({0.id:d}, "{0.variety:s}", {0.latitude:f}, {0.longitude:f}) ;'''.format(tree));
-    ###
-    connection.commit();
-    PrintNow('inserted {:d} rows'.format(count));
-    ###
+            continue
+
+        count += 1
+        cursor.execute('''INSERT INTO Trees(id, variety, latitude, longitude) VALUES ({0.id:d}, "{0.variety:s}", {0.latitude:f}, {0.longitude:f}) ;'''.format(tree))
+
+    connection.commit()
+    PrintNow('inserted {:d} rows'.format(count))
+
     # Debug
-    ###
+
     if False:
-        cursor.execute('''SELECT * FROM POIs ;''');
-        PrintNow(*('\t'.join(str(col) for col in row) for row in cursor), sep = '\n');
-    ###
+        cursor.execute('''SELECT * FROM POIs ;''')
+        PrintNow(*('\t'.join(str(col) for col in row) for row in cursor), sep = '\n')
+
     # Garbage
-    ###
-    connection.close();
-    ###
-    return;
+
+    connection.close()
+
+    return
 
 def Mashup(osmFileName, datDirectory, pickleFileName = None):
-    ###
+
     # Maybe load pickle
-    ###
-    pickleFileName = '{}/{}'.format(datDirectory, pickleFileName);
+
+    pickleFileName = '{}/{}'.format(datDirectory, pickleFileName)
     if Exists(pickleFileName):
-        PrintNow('Reading {:s} ... '.format(pickleFileName), end = '');
-        ###
+        PrintNow('Reading {:s} ... '.format(pickleFileName), end = '')
+
         # Load pickle
-        ###
+
         with open(pickleFileName, 'rb') as f:
-            pickle = UnPickle(f);
-        ###
-        id2Node = pickle.get('id2Node');
-        id2Edge = pickle.get('id2Edge');
-        graphIds = pickle.get('graphIds');
-        id2Poi = pickle.get('id2Poi');
-        id2Tree = pickle.get('id2Tree');
-        ###
-        PrintNow('done');
+            pickle = UnPickle(f)
+
+        id2Node = pickle.get('id2Node')
+        id2Edge = pickle.get('id2Edge')
+        graphIds = pickle.get('graphIds')
+        id2Poi = pickle.get('id2Poi')
+        id2Tree = pickle.get('id2Tree')
+
+        PrintNow('done')
     else:
-        PrintNow('Pickle `{}` was not found ... generating graph instead'.format(pickleFileName));
-        ###
+        PrintNow('Pickle `{}` was not found ... generating graph instead'.format(pickleFileName))
+
         # Read OSM file
-        ###
-        osmFileName = '{}/{}'.format(datDirectory, osmFileName);
-        osmRoot = ReadOsmFile(osmFileName);
-        ###
+
+        osmFileName = '{}/{}'.format(datDirectory, osmFileName)
+        osmRoot = ReadOsmFile(osmFileName)
+
         # Parse OSM nodes
-        ###
-        id2Node = ParseOSMNodes(osmRoot);
-        ###
+
+        id2Node = ParseOSMNodes(osmRoot)
+
         # Parse OSM ways
-        ###
-        id2Edge = ParseOSMWays(osmRoot, id2Node);
-        ###
+
+        id2Edge = ParseOSMWays(osmRoot, id2Node)
+
         # Build graph
-        ###
-        BuildGraph(id2Node, id2Edge);
-        ###
+
+        BuildGraph(id2Node, id2Edge)
+
         # Trim disconnected graphs
-        ###
-        graphIds = TrimGraph(id2Node, id2Edge);
-        ###
+
+        graphIds = TrimGraph(id2Node, id2Edge)
+
         # Link identical nodes with 0-length edges
-        ###
-        CloseGraph(id2Node, id2Edge, graphIds);
-        ###
+
+        CloseGraph(id2Node, id2Edge, graphIds)
+
         # Snap POI's to intersection nodes
-        ###
-        id2Poi = SnapPOIs(id2Node, graphIds, datDirectory);
-        ###
+
+        id2Poi = SnapPOIs(id2Node, graphIds, datDirectory)
+
         # Snap Trees to edges
-        ###
-        id2Tree = SnapTrees(id2Node, id2Edge, graphIds, datDirectory);
-        ###
+
+        id2Tree = SnapTrees(id2Node, id2Edge, graphIds, datDirectory)
+
         # Dump pickle
-        ###
+
         dat = {
             'id2Node' : id2Node,
             'id2Edge' : id2Edge,
             'graphIds' : graphIds,
             'id2Poi' : id2Poi,
             'id2Tree' : id2Tree,
-        };
-        ###
-        with open(pickleFileName, 'wb') as f:
-            PrintNow('Writing {:s} ... '.format(pickleFileName), end = '');
-            Pickle(dat, f);
-            PrintNow('done');
-    ###
-    # Write MySql tables
-    ###
-    CreateTables(id2Node, id2Edge, id2Poi, id2Tree, graphIds);
-    ###
-    return;
+        }
 
-###
-### Post MySQL
-###
+        with open(pickleFileName, 'wb') as f:
+            PrintNow('Writing {:s} ... '.format(pickleFileName), end = '')
+            Pickle(dat, f)
+            PrintNow('done')
+
+    # Write MySql tables
+
+    CreateTables(id2Node, id2Edge, id2Poi, id2Tree, graphIds)
+
+    return
+
+# Post MySQL
 
 def MySql2Graph():
-    ###
+
     # Connect to database and initialize cursor
-    ###
-    PrintNow('Using {} ... '.format(mySqlDataBase), end = '');
-    connection = MySqlConnect(user = 'root', port = 3306, db = mySqlDataBase);
-    cursor = connection.cursor();
-    PrintNow('done');
-    ###
+
+    PrintNow('Using {} ... '.format(mySqlDataBase), end = '')
+    connection = MySqlConnect(user = 'root', port = 3306, db = mySqlDataBase)
+    cursor = connection.cursor()
+    PrintNow('done')
+
     # id2Node
-    ###
-    PrintNow('Loading Nodes ... ', end = '');
-    cursor.execute('''SELECT * FROM Nodes ;''');
-    id2Node = {nodeId : Node(nodeId, *other) for nodeId, *other in cursor};
-    PrintNow('found {:d}'.format(len(id2Node)));
-    ###
+
+    PrintNow('Loading Nodes ... ', end = '')
+    cursor.execute('''SELECT * FROM Nodes ;''')
+    id2Node = {nodeId : Node(nodeId, *other) for nodeId, *other in cursor}
+    PrintNow('found {:d}'.format(len(id2Node)))
+
     # id2Edge
-    ###
-    PrintNow('Loading Edges ... ', end = '');
-    cursor.execute('''SELECT * FROM Edges ;''');
-    id2Edge = {edgeId : Edge(edgeId, *other) for edgeId, *other in cursor};
-    PrintNow('found {:d}'.format(len(id2Edge)));
-    ###
+
+    PrintNow('Loading Edges ... ', end = '')
+    cursor.execute('''SELECT * FROM Edges ;''')
+    id2Edge = {edgeId : Edge(edgeId, *other) for edgeId, *other in cursor}
+    PrintNow('found {:d}'.format(len(id2Edge)))
+
     # id2Poi
-    ###
-    PrintNow('Loading POIs ... ', end = '');
-    cursor.execute('''SELECT * FROM POIs ;''');
-    id2Poi = {poiId : POI(poiId, *other) for poiId, *other in cursor};
-    PrintNow('found {:d}'.format(len(id2Poi)));
-    ###
+
+    PrintNow('Loading POIs ... ', end = '')
+    cursor.execute('''SELECT * FROM POIs ;''')
+    id2Poi = {poiId : POI(poiId, *other) for poiId, *other in cursor}
+    PrintNow('found {:d}'.format(len(id2Poi)))
+
     # id2Tree
-    ###
-    PrintNow('Loading Trees ... ', end = '');
-    cursor.execute('''SELECT * FROM Trees ;''');
-    id2Tree = {treeId : Tree(False, treeId, *other) for treeId, *other in cursor};
-    PrintNow('found {:d}'.format(len(id2Tree)));
-    ###
+
+    PrintNow('Loading Trees ... ', end = '')
+    cursor.execute('''SELECT * FROM Trees ;''')
+    id2Tree = {treeId : Tree(False, treeId, *other) for treeId, *other in cursor}
+    PrintNow('found {:d}'.format(len(id2Tree)))
+
     # graphIds
-    ###
-    graphIds = list(nodeId for nodeId, node in id2Node.items() if node.isIntersection);
-    ###
-    PrintNow('Finished loading MySQL database `{}`.'.format(mySqlDataBase));
-    ###
-    return id2Node, id2Edge, id2Poi, id2Tree, graphIds;
+
+    graphIds = list(nodeId for nodeId, node in id2Node.items() if node.isIntersection)
+
+    PrintNow('Finished loading MySQL database `{}`.'.format(mySqlDataBase))
+
+    return id2Node, id2Edge, id2Poi, id2Tree, graphIds
 
 def FindPOIs(nodeIds, id2Node, id2Poi):
-    PrintNow('Locating POI\'s ... ', end = '');
-    poiIds = list(set(poiId for nodeId in nodeIds for poiId in id2Node.get(nodeId).poiIds if poiId in id2Poi));
-    PrintNow('found {:d}'.format(len(poiIds)));
-    return poiIds;
+    PrintNow('Locating POI\'s ... ', end = '')
+    poiIds = list(set(poiId for nodeId in nodeIds for poiId in id2Node.get(nodeId).poiIds if poiId in id2Poi))
+    PrintNow('found {:d}'.format(len(poiIds)))
+    return poiIds
 
 def LatLngDistance(latitude1, longitude1, latitude2, longitude2):
-    '''http://www.johndcook.com/python_longitude_latitude.html''';
-    ###
-    phi1 = (90 - latitude1) * radiansPerDegree;
-    phi2 = (90 - latitude2) * radiansPerDegree;
-    ###
-    deltaTheta = (longitude1 - longitude2) * radiansPerDegree;
-    ###
-    argument = Sine(phi1) * Sine(phi2) * Cosine(deltaTheta) + Cosine(phi1) * Cosine(phi2);
-    ###
+    '''http://www.johndcook.com/python_longitude_latitude.html'''
+
+    phi1 = (90 - latitude1) * radiansPerDegree
+    phi2 = (90 - latitude2) * radiansPerDegree
+
+    deltaTheta = (longitude1 - longitude2) * radiansPerDegree
+
+    argument = Sine(phi1) * Sine(phi2) * Cosine(deltaTheta) + Cosine(phi1) * Cosine(phi2)
+
     # Positions are the same!
-    ###
+
     if argument > 1:
-        return 0;
-    ###
-    return radiusOfEarth * ArcCosine(argument);
+        return 0
+
+    return radiusOfEarth * ArcCosine(argument)
 
 def ExtremeNode(nodeIds, id2Node, attribute, index):
-    return list(sorted((getattr(node, attribute), nodeId) for nodeId in nodeIds for node in [id2Node.get(nodeId)]))[index][1];
+    return list(sorted((getattr(node, attribute), nodeId) for nodeId in nodeIds for node in [id2Node.get(nodeId)]))[index][1]
 
 def BottomNode(nodeIds, id2Node):
-    return ExtremeNode(nodeIds, id2Node, attribute = 'latitude', index = -1);
+    return ExtremeNode(nodeIds, id2Node, attribute = 'latitude', index = -1)
 
 def LeftNode(nodeIds, id2Node):
-    return ExtremeNode(nodeIds, id2Node, attribute = 'longitude', index = 0);
+    return ExtremeNode(nodeIds, id2Node, attribute = 'longitude', index = 0)
 
 def RightNode(nodeIds, id2Node):
-    return ExtremeNode(nodeIds, id2Node, attribute = 'longitude', index = -1);
+    return ExtremeNode(nodeIds, id2Node, attribute = 'longitude', index = -1)
 
 def TopNode(nodeIds, id2Node):
-    return ExtremeNode(nodeIds, id2Node, attribute = 'latitude', index = 0);
+    return ExtremeNode(nodeIds, id2Node, attribute = 'latitude', index = 0)
 
 def CropGraph(center, radius, id2Thing, thingIds, description):
-    PrintNow('Cropping {:G}km around ({:G}, {:G}) ... '.format(radius / 1e3, *center), end = '');
-    ###
+    PrintNow('Cropping {:G}km around ({:G}, {:G}) ... '.format(radius / 1e3, *center), end = '')
+
     # Crop to square
-    ###
-    xmin, xmax, ymin, ymax = center[1] - radius / meterPerLng, center[1] + radius / meterPerLng, center[0] - radius / meterPerLat, center[0] + radius / meterPerLat;
-    things = [thing for thingId in thingIds for thing in [id2Thing.get(thingId)] if xmin <= thing.longitude <= xmax and ymin <= thing.latitude <= ymax];
-    ###
+
+    xmin, xmax, ymin, ymax = center[1] - radius / meterPerLng, center[1] + radius / meterPerLng, center[0] - radius / meterPerLat, center[0] + radius / meterPerLat
+    things = [thing for thingId in thingIds for thing in [id2Thing.get(thingId)] if xmin <= thing.longitude <= xmax and ymin <= thing.latitude <= ymax]
+
     # Crop to circle
-    ###
-    croppedIds = [thing.id for thing in things if LatLngDistance(center[0], center[1], thing.latitude, thing.longitude) <= radius];
-    ###
-    PrintNow('{:d} {:s} remain'.format(len(croppedIds), description));
-    ###
-    return croppedIds;
+
+    croppedIds = [thing.id for thing in things if LatLngDistance(center[0], center[1], thing.latitude, thing.longitude) <= radius]
+
+    PrintNow('{:d} {:s} remain'.format(len(croppedIds), description))
+
+    return croppedIds
 
 def GeoCode(address):
-    from urllib.request import urlopen as UrlOpen;
-    from urllib.parse import quote as Quote;
-    ###
+    from urllib.request import urlopen as UrlOpen
+    from urllib.parse import quote as Quote
+
     # Encode query string into URL
-    ###
-    url = 'http://maps.googleapis.com/maps/api/geocode/json?address={}&sensor=false'.format(Quote(address));
-    ###
+
+    url = 'http://maps.googleapis.com/maps/api/geocode/json?address={}&sensor=false'.format(Quote(address))
+
     # Call API and extract JSON
-    ###
-    PrintNow('Calling Google Maps API for `{:s}` ... '.format(address), end = '');
-    json = UrlOpen(url).read();
-    json = JSONLoad(json.decode('utf-8'));
-    ###
+
+    PrintNow('Calling Google Maps API for `{:s}` ... '.format(address), end = '')
+    json = UrlOpen(url).read()
+    json = JSONLoad(json.decode('utf-8'))
+
     # Extract longitude and latitude
-    ###
+
     if json.get('status') == 'ZERO_RESULTS':
-        latitude, longitude = None, None;
-        ###
-        PrintNow('it was not found');
+        latitude, longitude = None, None
+
+        PrintNow('it was not found')
     else:
-        latitude, longitude = (value for key, value in sorted(json.get('results')[0].get('geometry').get('location').items()));
-        ###
-        PrintNow('it is located at {:f}/{:f}'.format(latitude, longitude));
-    ###
-    return Address(address, latitude, longitude);
+        latitude, longitude = (value for key, value in sorted(json.get('results')[0].get('geometry').get('location').items()))
+
+        PrintNow('it is located at {:f}/{:f}'.format(latitude, longitude))
+
+    return Address(address, latitude, longitude)
 
 def FindAddress(query, minutes, id2Node, id2Poi, graphIds, id2Tree):
-    ###
+
     # Specify San Francisco!
-    ###
+
     if all(city not in query.lower() for city in ('sf', 'san francisco', 's.f.')):
-        query += ', San Francisco, CA';
-    ###
+        query += ', San Francisco, CA'
+
     # Geocode it
-    ###
-    address = GeoCode(query);
-    ###
+
+    address = GeoCode(query)
+
     # Check if the address is in bounds
-    ###
+
     if address.latitude is None or address.longitude is None or not InBounds(address):
-        return None;
-    ###
+        return None
+
     # Grab address lat/lng
-    ###
-    latlng = (address.latitude, address.longitude);
-    ###
+
+    latlng = (address.latitude, address.longitude)
+
     # Calculate center, radius, and bounds
-    ###
-    center = (address.latitude, address.longitude);
-    radius = meterPerMin * minutes;
-    ###
-    bounds = [[center[0] - radius / meterPerLat, center[1] - radius / meterPerLng], [center[0] + radius / meterPerLat, center[1] + radius / meterPerLng]];
-    ###
+
+    center = (address.latitude, address.longitude)
+    radius = meterPerMin * minutes
+
+    bounds = [[center[0] - radius / meterPerLat, center[1] - radius / meterPerLng], [center[0] + radius / meterPerLat, center[1] + radius / meterPerLng]]
+
     # Crop graph
-    ###
-    bufferIds = CropGraph(center, radius * 1.5, id2Node, graphIds, 'nodes');
-    croppedIds = CropGraph(center, radius, id2Node, bufferIds, 'nodes');
-    ###
+
+    bufferIds = CropGraph(center, radius * 1.5, id2Node, graphIds, 'nodes')
+    croppedIds = CropGraph(center, radius, id2Node, bufferIds, 'nodes')
+
     # Snap to nearest node
-    ###
-    nodeId, offset = NearestNode(address.latitude, address.longitude, croppedIds, id2Node);
-    ###
+
+    nodeId, offset = NearestNode(address.latitude, address.longitude, croppedIds, id2Node)
+
     # Find POI's
-    ###
-    poiIds = FindPOIs(croppedIds, id2Node, id2Poi);
-    POIs = [id2Poi.get(poiId) for poiId in poiIds];
-    ###
+
+    poiIds = FindPOIs(croppedIds, id2Node, id2Poi)
+    POIs = [id2Poi.get(poiId) for poiId in poiIds]
+
     # Find trees
-    ###
-    trees = [id2Tree.get(treeId) for treeId in CropGraph(center, radius * 1.5, id2Tree, id2Tree, 'trees')];
-    ###
+
+    trees = [id2Tree.get(treeId) for treeId in CropGraph(center, radius * 1.5, id2Tree, id2Tree, 'trees')]
+
     # Build JSON
-    ###
+
     json = {
         'query' : query,
         'minutes' : minutes,
@@ -1046,138 +1027,138 @@ def FindAddress(query, minutes, id2Node, id2Poi, graphIds, id2Tree):
         'poiIds' : poiIds,
         'POIs' : GeoJSON(POIs),
         'trees' : GeoJSON(trees),
-    };
-    ###
-    return json;
+    }
+
+    return json
 
 def FinePath(pathIds, nodeIds, id2Node, id2Edge):
-    PrintNow('Building fine path ... ', end = '');
-    ###
+    PrintNow('Building fine path ... ', end = '')
+
     # Build path points
-    ###
-    longitudes, latitudes = [], [];
-    previous = current = None;
-    ###
+
+    longitudes, latitudes = [], []
+    previous = current = None
+
     for nodeId in pathIds:
-        current = id2Node.get(nodeId);
-        ###
+        current = id2Node.get(nodeId)
+
         if previous is not None:
-            edgeId = current.edgeIds[current.nodeIds.index(previous.id)];
-            edge = id2Edge.get(edgeId);
-            ###
-            index = edge.nodeIds.index(previous.id);
-            jndex = edge.nodeIds.index(current.id);
-            ###
+            edgeId = current.edgeIds[current.nodeIds.index(previous.id)]
+            edge = id2Edge.get(edgeId)
+
+            index = edge.nodeIds.index(previous.id)
+            jndex = edge.nodeIds.index(current.id)
+
             if index > jndex:
-                step = -1;
+                step = -1
             else:
-                step = +1;
-            nodeIds = edge.nodeIds[index : jndex + step : step];
-            ###
-            longitudes.extend((id2Node.get(nodeId).longitude for nodeId in nodeIds));
-            latitudes.extend((id2Node.get(nodeId).latitude for nodeId in nodeIds));
-        ###
-        previous = current;
-    latlngs = list(zip(latitudes, longitudes));
-    ###
-    PrintNow('contains {:d} fine nodes'.format(len(longitudes)));
-    ###
-    return latlngs;
+                step = +1
+            nodeIds = edge.nodeIds[index : jndex + step : step]
+
+            longitudes.extend((id2Node.get(nodeId).longitude for nodeId in nodeIds))
+            latitudes.extend((id2Node.get(nodeId).latitude for nodeId in nodeIds))
+
+        previous = current
+    latlngs = list(zip(latitudes, longitudes))
+
+    PrintNow('contains {:d} fine nodes'.format(len(longitudes)))
+
+    return latlngs
 
 def Dijkstra(start, finishes, id2Node, id2Edge):
-    assert(start in id2Node);
-    assert(all(finish in id2Node for finish in finishes));
-    ###
+    assert(start in id2Node)
+    assert(all(finish in id2Node for finish in finishes))
+
     # Initialize
-    ###
-    uninspected = id2Node.copy();
-    ###
-    id2Distance = {nodeId : 1e9 for nodeId in uninspected};
-    id2Distance[start] = 0;
-    id2From = {};
-    ###
+
+    uninspected = id2Node.copy()
+
+    id2Distance = {nodeId : 1e9 for nodeId in uninspected}
+    id2Distance[start] = 0
+    id2From = {}
+
     # Inspect each node
-    ###
+
     while uninspected:
-        ###
+
         # Walk to nearest node
-        ###
-        distance = min(id2Distance.get(nodeId) for nodeId in uninspected);
-        nearest = next(nodeId for nodeId in uninspected if distance == id2Distance.get(nodeId));
-        ###
+
+        distance = min(id2Distance.get(nodeId) for nodeId in uninspected)
+        nearest = next(nodeId for nodeId in uninspected if distance == id2Distance.get(nodeId))
+
         # Kick out if at finish
-        ###
+
         if nearest in finishes:
-            break;
-        ###
+            break
+
         # Declare nearest to be inspected
-        ###
-        nearest = uninspected.pop(nearest);
-        ###
+
+        nearest = uninspected.pop(nearest)
+
         # Walk to each uninspected neighbor
-        ###
+
         for nodeId, edgeId, length in zip(nearest.nodeIds, nearest.edgeIds, nearest.lengths):
-            ###
+
             # Kick out inspected
-            ###
+
             if nodeId not in uninspected:
-                continue;
-            ###
+                continue
+
             # Reduce edge distance according to tree density
-            ###
-            edge = id2Edge.get(edgeId);
-            treePerMeter = distance and edge.treeCount / distance;
-            distance *= (1 - min(maximumDistanceReduction, treePerMeter / maximumTreePerMeter));
-            ###
+
+            edge = id2Edge.get(edgeId)
+            treePerMeter = distance and edge.treeCount / distance
+            distance *= (1 - min(maximumDistanceReduction, treePerMeter / maximumTreePerMeter))
+
             # Calculate distance
-            ###
-            length += distance;
-            ###
+
+            length += distance
+
             # Use shortest path
-            ###
+
             if length < id2Distance.get(nodeId):
-                id2Distance[nodeId] = length;
-                id2From[nodeId] = nearest.id;
-    ###
+                id2Distance[nodeId] = length
+                id2From[nodeId] = nearest.id
+
     # Construct shortest path
-    ###
-    nodeId = nearest;
-    path = [nodeId];
+
+    nodeId = nearest
+    path = [nodeId]
     while nodeId != start:
-        nodeId = id2From.get(nodeId);
-        path.insert(0, nodeId);
-    ###
-    return path, id2Distance.get(nearest);
+        nodeId = id2From.get(nodeId)
+        path.insert(0, nodeId)
+
+    return path, id2Distance.get(nearest)
 
 def Route(startId, finishIds, nodeIds, id2Node, id2Edge):
-    PrintNow('Routing a path from {:d} to {:s} ... '.format(startId, finishIds), end = '');
-    subGraph = {nodeId : id2Node.get(nodeId) for nodeId in nodeIds};
-    pathIds, distance = Dijkstra(startId, finishIds, subGraph, id2Edge);
-    PrintNow('{:d} edges take {:G}km'.format(len(pathIds) - 1, distance / 1e3));
-    ###
-    return pathIds, distance;
+    PrintNow('Routing a path from {:d} to {:s} ... '.format(startId, finishIds), end = '')
+    subGraph = {nodeId : id2Node.get(nodeId) for nodeId in nodeIds}
+    pathIds, distance = Dijkstra(startId, finishIds, subGraph, id2Edge)
+    PrintNow('{:d} edges take {:G}km'.format(len(pathIds) - 1, distance / 1e3))
+
+    return pathIds, distance
 
 def RoutePOI(startId, poiId, nodeIds, id2Node, id2Edge, id2Poi):
-    ###
+
     # Extract POI
-    ###
-    poi = id2Poi.get(poiId);
-    finishIds = poi.nodeIds;
-    ###
+
+    poi = id2Poi.get(poiId)
+    finishIds = poi.nodeIds
+
     # Route
-    ###
-    pathIds, distance = Route(startId, finishIds, nodeIds, id2Node, id2Edge);
-    ###
+
+    pathIds, distance = Route(startId, finishIds, nodeIds, id2Node, id2Edge)
+
     # Build fine-path
-    ###
-    latlngs = FinePath(pathIds, nodeIds, id2Node, id2Edge);
-    ###
+
+    latlngs = FinePath(pathIds, nodeIds, id2Node, id2Edge)
+
     # Grab offset
-    ###
-    offset = poi.offsets[poi.nodeIds.index(pathIds[-1])];
-    ###
+
+    offset = poi.offsets[poi.nodeIds.index(pathIds[-1])]
+
     # Build JSON
-    ###
+
     json = {
         'startId' : startId,
         'poiId' : poiId,
@@ -1189,125 +1170,117 @@ def RoutePOI(startId, poiId, nodeIds, id2Node, id2Edge, id2Poi):
         'pathIds' : pathIds,
         'distance' : distance,
         'latlngs' : latlngs,
-    };
-    ###
-    return json;
+    }
+
+    return json
 
 def DebugPlot(pathIds, nodeIds, id2Node, id2Edge, pdfFileName = 'debug.pdf'):
-    import matplotlib.pyplot as Plot;
-    ###
-    PrintNow('Plotting graph ... ', end = '');
-    ###
+    import matplotlib.pyplot as Plot
+
+    PrintNow('Plotting graph ... ', end = '')
+
     # Initialize
-    ###
-    fig, ax = Plot.subplots();
-    ###
+
+    fig, ax = Plot.subplots()
+
     # Draw Streets
-    ###
-    x, y = [], [];
-    ###
+
+    x, y = [], []
+
     for nodeId in nodeIds:
-        iNode = id2Node.get(nodeId);
-        ###
+        iNode = id2Node.get(nodeId)
+
         for nodeJd in iNode.nodeIds:
-            edge = id2Edge.get(iNode.edgeIds[iNode.nodeIds.index(nodeJd)]);
-            ###
-            index = edge.nodeIds.index(nodeId);
-            jndex = edge.nodeIds.index(nodeJd);
-            ###
+            edge = id2Edge.get(iNode.edgeIds[iNode.nodeIds.index(nodeJd)])
+
+            index = edge.nodeIds.index(nodeId)
+            jndex = edge.nodeIds.index(nodeJd)
+
             if index > jndex:
-                step = -1;
+                step = -1
             else:
-                step = +1;
-            nodeIds = edge.nodeIds[index : jndex + step : step];
-            ###
-            x.extend((id2Node.get(nodeId).longitude for nodeId in nodeIds));
-            y.extend((id2Node.get(nodeId).latitude for nodeId in nodeIds));
-            ###
-            x.append(None);
-            y.append(None);
-    ###
-    Plot.plot(x, y, color = 'black', linewidth = 0.5);
-    ###
+                step = +1
+            nodeIds = edge.nodeIds[index : jndex + step : step]
+
+            x.extend((id2Node.get(nodeId).longitude for nodeId in nodeIds))
+            y.extend((id2Node.get(nodeId).latitude for nodeId in nodeIds))
+
+            x.append(None)
+            y.append(None)
+
+    Plot.plot(x, y, color = 'black', linewidth = 0.5)
+
     # Draw Intersections
-    ###
-    x, y = [], [];
+
+    x, y = [], []
     for nodeId in nodeIds:
-        node = id2Node.get(nodeId);
-        x.extend((node.longitude, None));
-        y.extend((node.latitude, None));
-    Plot.plot(x, y, marker = 'o', markersize = 1, markerfacecolor = 'blue', markeredgecolor = 'blue');
-    ###
+        node = id2Node.get(nodeId)
+        x.extend((node.longitude, None))
+        y.extend((node.latitude, None))
+    Plot.plot(x, y, marker = 'o', markersize = 1, markerfacecolor = 'blue', markeredgecolor = 'blue')
+
     # Draw path
-    ###
-    x, y = [], [];
-    previous = current = None;
-    ###
+
+    x, y = [], []
+    previous = current = None
+
     for nodeId in pathIds:
-        current = id2Node.get(nodeId);
-        ###
+        current = id2Node.get(nodeId)
+
         if previous is not None:
-            edge = id2Edge.get(current.edgeIds[current.nodeIds.index(previous.id)]);
-            ###
-            index = edge.nodeIds.index(previous.id);
-            jndex = edge.nodeIds.index(current.id);
-            ###
+            edge = id2Edge.get(current.edgeIds[current.nodeIds.index(previous.id)])
+
+            index = edge.nodeIds.index(previous.id)
+            jndex = edge.nodeIds.index(current.id)
+
             if index > jndex:
-                step = -1;
+                step = -1
             else:
-                step = +1;
-            nodeIds = edge.nodeIds[index : jndex + step : step];
-            ###
-            x.extend((id2Node.get(nodeId).longitude for nodeId in nodeIds));
-            y.extend((id2Node.get(nodeId).latitude for nodeId in nodeIds));
-            ###
-            x.append(None);
-            y.append(None);
-        ###
-        previous = current;
-    ###
-    Plot.plot(x, y, color = 'orange', linewidth = 4, alpha = 0.5, marker = None);
-    ###
+                step = +1
+            nodeIds = edge.nodeIds[index : jndex + step : step]
+
+            x.extend((id2Node.get(nodeId).longitude for nodeId in nodeIds))
+            y.extend((id2Node.get(nodeId).latitude for nodeId in nodeIds))
+
+            x.append(None)
+            y.append(None)
+
+        previous = current
+
+    Plot.plot(x, y, color = 'orange', linewidth = 4, alpha = 0.5, marker = None)
+
     # Draw start/finish
-    ###
-    startId, finishId = pathIds[0], pathIds[-1];
-    x, y = id2Node.get(startId).longitude, id2Node.get(startId).latitude;
-    Plot.plot(x, y, marker = 'x', markersize = 8, markeredgewidth = 2, markerfacecolor = 'green', markeredgecolor = 'green');
-    ###
-    x, y = id2Node.get(finishId).longitude, id2Node.get(finishId).latitude;
-    Plot.plot(x, y, marker = 'x', markersize = 8, markeredgewidth = 2, markerfacecolor = 'green', markeredgecolor = 'red');
-    ###
+
+    startId, finishId = pathIds[0], pathIds[-1]
+    x, y = id2Node.get(startId).longitude, id2Node.get(startId).latitude
+    Plot.plot(x, y, marker = 'x', markersize = 8, markeredgewidth = 2, markerfacecolor = 'green', markeredgecolor = 'green')
+
+    x, y = id2Node.get(finishId).longitude, id2Node.get(finishId).latitude
+    Plot.plot(x, y, marker = 'x', markersize = 8, markeredgewidth = 2, markerfacecolor = 'green', markeredgecolor = 'red')
+
     # Pretty
-    ###
-    ax.set_xlim((-122.4592000, -122.4156000));
-    ax.set_ylim((37.7719000, 37.7923000));
+
+    ax.set_xlim((-122.4592000, -122.4156000))
+    ax.set_ylim((37.7719000, 37.7923000))
     ax.set_title('Path from {:d} to {:d}'.format(startId, finishId))
     ax.get_xaxis().set_visible(False)
     ax.get_yaxis().set_visible(False)
-    fig.savefig(pdfFileName);
-    ###
-    PrintNow('saved to {:d}'.format(pdfFileName));
-    ###
-    return;
+    fig.savefig(pdfFileName)
 
-###
-### Filenames
-###
+    PrintNow('saved to {:d}'.format(pdfFileName))
 
-datDirectory = './static/dat' ;
-###
-osmFileName = 'neighborhood.osm' ;
-osmFileName = 'sf-city.osm' ;
-###
-treeFileName = 'sfTrees';
-###
-mySqlDataBase = 'dogWalkScore6';
-###
-pickleFileName = '{}.pkl'.format(mySqlDataBase);
+    return
 
-###
-### Script
-###
+# Filenames
+
+datDirectory = './static/dat' 
+osmFileName = 'neighborhood.osm' 
+osmFileName = 'sf-city.osm' 
+treeFileName = 'sfTrees'
+mySqlDataBase = 'dogWalkScore6'
+pickleFileName = '{}.pkl'.format(mySqlDataBase)
+
+# Script
 
 if __name__ == '__main__':
-    Mashup(osmFileName, datDirectory, pickleFileName);
+    Mashup(osmFileName, datDirectory, pickleFileName)
