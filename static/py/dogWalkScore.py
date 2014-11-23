@@ -43,6 +43,13 @@ maximumDistanceReduction = 0.3
 # Classes
 
 class Address:
+
+    __slots__ = [
+        'address',
+        'latitude',
+        'longitude',
+    ]
+
     def __init__(self, *args):
         self.address, self.latitude, self.longitude = args
 
@@ -50,6 +57,14 @@ class Address:
 
 class Tree:
     '''https://data.sfgov.org/Public-Works/Street-Tree-List/tkzw-k3nq'''
+
+    __slots__ = [
+        'id',
+        'variety',
+        'latitude',
+        'longitude',
+    ]
+
     def __init__(self, *args):
         if 4 == len(args):
 
@@ -70,6 +85,22 @@ class Tree:
 
 class POI:
     '''http://www.yelp.com/developers/documentation/v2/search_api#rValue'''
+
+    __slots__ = [
+        'id',
+        'poiType',
+        'name',
+        'nodeIds',
+        'offsets',
+        'latitude',
+        'longitude',
+        'address',
+        'city',
+        'state',
+        'imageUrl',
+        'yelpUrl',
+    ]
+
     def __init__(self, *args):
         if 4 == len(args):
             json, poiType, nodeIds, offsets = args
@@ -119,6 +150,18 @@ class POI:
 
 class Node:
     '''http://wiki.openstreetmap.org/wiki/Node'''
+
+    __slots__ = [
+        'id',
+        'isIntersection',
+        'latitude',
+        'longitude',
+        'nodeIds',
+        'edgeIds',
+        'lengths',
+        'poiIds',
+    ]
+
     def __init__(self, *args):
         if 1 == len(args):
             nodeXml, = args
@@ -163,6 +206,14 @@ class Node:
 
 class Edge:
     '''http://wiki.openstreetmap.org/wiki/Way'''
+
+    __slots__ = [
+        'id',
+        'name',
+        'nodeIds',
+        'treeCount',
+    ]
+
     def __init__(self, *args):
         if 2 == len(args):
             xml, id2Node = args
@@ -1131,7 +1182,7 @@ def Dijkstra(start, finishes, id2Node, id2Edge):
     return path, id2Distance.get(nearest)
 
 def Route(startId, finishIds, nodeIds, id2Node, id2Edge):
-    PrintNow('Routing a path from {:d} to {:s} ... '.format(startId, finishIds), end = '')
+    PrintNow('Routing a path from {:d} to {} ... '.format(startId, len(finishIds)), end = '')
     subGraph = {nodeId : id2Node.get(nodeId) for nodeId in nodeIds}
     pathIds, distance = Dijkstra(startId, finishIds, subGraph, id2Edge)
     PrintNow('{:d} edges take {:G}km'.format(len(pathIds) - 1, distance / 1e3))
@@ -1273,9 +1324,9 @@ def DebugPlot(pathIds, nodeIds, id2Node, id2Edge, pdfFileName = 'debug.pdf'):
 
 # Filenames
 
-datDirectory = './static/dat' 
-osmFileName = 'neighborhood.osm' 
-osmFileName = 'sf-city.osm' 
+datDirectory = './static/dat'
+osmFileName = 'neighborhood.osm'
+osmFileName = 'sf-city.osm'
 treeFileName = 'sfTrees'
 mySqlDataBase = 'dogWalkScore6'
 pickleFileName = '{}.pkl'.format(mySqlDataBase)
